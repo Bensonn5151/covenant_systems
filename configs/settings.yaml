@@ -1,0 +1,211 @@
+# ========================================
+# COVENANT SYSTEMS - Core Settings
+# ========================================
+
+system:
+  name: "Covenant Compliance Engine"
+  version: "0.1.0-mvp"
+  environment: "development"
+
+# Data Architecture Layers
+layers:
+  bronze:
+    description: "Raw extraction layer - no transformation"
+    path: "storage/bronze"
+    preserve_original: true
+    allowed_transformations: []
+
+  silver:
+    description: "Structured segmentation layer"
+    path: "storage/silver"
+    transformations:
+      - "section_extraction"
+      - "metadata_inference"
+      - "hierarchy_detection"
+      - "normalization"
+    preserve_verbatim: true
+
+  gold:
+    description: "Semantic intelligence layer"
+    path: "storage/gold"
+    transformations:
+      - "embedding_generation"
+      - "classification"
+      - "relationship_mapping"
+      - "risk_scoring"
+
+# Document Processing
+document_processing:
+  ocr:
+    enabled: true
+    trigger_conditions:
+      - "no_text_layer"
+      - "char_count_below_threshold"
+    threshold:
+      min_chars: 50
+      min_filesize_kb: 100
+    engine: "tesseract"
+    languages: ["eng"]
+    dpi: 300
+
+  pdf:
+    max_pages: 1000
+    extract_images: false
+    extract_tables: true
+
+  segmentation:
+    patterns:
+      section_markers:
+        - '^\d+\.'
+        - '^\d+\.\d+'
+        - '^Section\s+\d+'
+        - '^Part\s+[IVXLCDM]+'
+        - '^Article\s+\d+'
+        - '^Division\s+\d+'
+      heading_markers:
+        - '^[A-Z][A-Z\s]+$'
+    min_section_length: 20
+    max_section_length: 5000
+    preserve_hierarchy: true
+
+# Jurisdictions & Domains
+taxonomies:
+  jurisdictions:
+    - Canada
+    - United States
+    - United Kingdom
+    - European Union
+    - International
+
+  regulatory_domains:
+    - Banking
+    - Anti-Money Laundering (AML)
+    - Privacy & Data Protection
+    - Cybersecurity
+    - Consumer Protection
+    - Securities
+    - Insurance
+    - Payments
+    - Cryptocurrency
+
+  document_types:
+    - Act
+    - Regulation
+    - Guideline
+    - Policy
+    - Standard
+    - Framework
+    - Directive
+
+# Metadata Schema
+metadata:
+  required_fields:
+    - document_id
+    - document_type
+    - source
+    - ingestion_date
+    - hash
+
+  optional_fields:
+    - jurisdiction
+    - regulator
+    - effective_date
+    - last_amended
+    - version
+    - topics
+    - risk_level
+
+# Embedding Configuration
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  dimension: 384
+  device: "cpu"
+  batch_size: 32
+  normalize: true
+  pooling: "mean"
+
+# Vector Database
+vector_db:
+  backend: "faiss"
+  index_type: "IVFFlat"
+  n_clusters: 100
+  metric: "cosine"
+  storage_path: "storage/vector_db"
+
+# Retrieval Pipeline
+retrieval:
+  stages:
+    - name: "sparse"
+      method: "bm25"
+      top_k: 20
+
+    - name: "dense"
+      method: "semantic"
+      top_k: 10
+
+    - name: "hybrid"
+      method: "rank_fusion"
+      alpha: 0.5  # weight between sparse and dense
+
+    - name: "rerank"
+      method: "cross_encoder"
+      model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+      top_k: 5
+
+  score_threshold: 0.7
+  max_results: 10
+
+# Knowledge Graph
+knowledge_graph:
+  node_types:
+    - regulation
+    - section
+    - clause
+    - definition
+    - obligation
+    - prohibition
+    - permission
+    - control
+
+  edge_types:
+    - cites
+    - references
+    - implements
+    - requires_alignment
+    - conflicts_with
+    - supersedes
+    - amends
+
+  storage:
+    format: "yaml"
+    nodes_file: "storage/knowledge_graph/nodes.yaml"
+    edges_file: "storage/knowledge_graph/edges.yaml"
+    domains_file: "storage/knowledge_graph/domains.yaml"
+
+# Quality & Validation
+quality:
+  hallucination_mode: "conservative"
+  confidence_threshold: 0.75
+
+  validation_rules:
+    - preserve_legal_text_verbatim
+    - no_invented_laws
+    - no_metadata_hallucination
+    - maintain_section_mapping
+
+  error_handling:
+    log_failures: true
+    fallback_strategies:
+      - "large_chunk_splitter"
+      - "manual_review_queue"
+
+# Logging
+logging:
+  level: "INFO"
+  format: "json"
+  output:
+    - console
+    - file
+  file_path: "logs/covenant.log"
+  rotation: "10 MB"
+  retention: "30 days"

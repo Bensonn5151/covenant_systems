@@ -1,0 +1,128 @@
+# ========================================
+# Quality & Confidence Thresholds
+# ========================================
+
+# Retrieval Thresholds
+retrieval:
+  semantic_similarity:
+    high_confidence: 0.85
+    medium_confidence: 0.70
+    low_confidence: 0.55
+    minimum_acceptable: 0.50
+
+  bm25_score:
+    high_relevance: 15.0
+    medium_relevance: 8.0
+    low_relevance: 3.0
+
+  reranker_score:
+    high_confidence: 0.90
+    medium_confidence: 0.75
+    low_confidence: 0.60
+    minimum_acceptable: 0.50
+
+# Compliance Evaluation Thresholds
+compliance:
+  verdict_confidence:
+    compliant: 0.85
+    non_compliant: 0.85
+    uncertain: 0.60
+
+  risk_levels:
+    critical: 0.90
+    high: 0.75
+    medium: 0.60
+    low: 0.40
+
+  evidence_strength:
+    strong: 0.85
+    moderate: 0.70
+    weak: 0.50
+    insufficient: 0.30
+
+# Document Processing Thresholds
+processing:
+  ocr:
+    trigger_char_count: 50
+    trigger_filesize_kb: 100
+    confidence_minimum: 0.70
+
+  segmentation:
+    min_section_length: 20
+    max_section_length: 5000
+    heading_confidence: 0.75
+
+  metadata_inference:
+    jurisdiction_confidence: 0.80
+    document_type_confidence: 0.85
+    topic_confidence: 0.70
+
+# Embedding & Indexing
+embeddings:
+  similarity_deduplication: 0.98  # Sections more similar than this are likely duplicates
+  cluster_threshold: 0.75
+  outlier_detection: 0.30
+
+# Knowledge Graph
+knowledge_graph:
+  edge_confidence:
+    strong_relationship: 0.85
+    moderate_relationship: 0.70
+    weak_relationship: 0.50
+    minimum_link: 0.40
+
+  node_importance:
+    critical: 0.90
+    high: 0.75
+    medium: 0.60
+    low: 0.40
+
+# Quality Gates
+quality_gates:
+  extraction:
+    text_coverage: 0.95  # % of PDF text successfully extracted
+    section_detection_rate: 0.90
+
+  segmentation:
+    boundary_accuracy: 0.85
+    hierarchy_preservation: 0.90
+
+  embedding:
+    index_build_success: 0.99
+    query_latency_ms: 100
+
+  retrieval:
+    precision_at_5: 0.80
+    recall_at_10: 0.70
+    mrr: 0.75  # Mean Reciprocal Rank
+
+# Error Handling
+error_handling:
+  max_retries: 3
+  timeout_seconds: 30
+  batch_failure_threshold: 0.10  # Fail batch if >10% of items fail
+
+# Performance Metrics
+performance:
+  latency:
+    query_p50_ms: 50
+    query_p95_ms: 200
+    query_p99_ms: 500
+
+  throughput:
+    documents_per_hour: 100
+    sections_per_second: 50
+
+# Data Quality
+data_quality:
+  completeness:
+    required_fields: 1.00
+    optional_fields: 0.80
+
+  consistency:
+    format_compliance: 0.95
+    schema_validation: 1.00
+
+  accuracy:
+    metadata_correctness: 0.90
+    citation_accuracy: 0.95

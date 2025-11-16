@@ -1,0 +1,90 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment Variables
+.env
+.env.local
+
+# Data Files
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+storage/bronze/*
+!storage/bronze/.gitkeep
+storage/silver/*
+!storage/silver/.gitkeep
+storage/gold/*
+!storage/gold/.gitkeep
+
+# Vector DB & Indexes
+storage/vector_db/*.index
+storage/vector_db/*.faiss
+storage/hybrid/*.pkl
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+postgres/data/
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# ML Models
+*.bin
+*.pt
+*.pth
+models/downloads/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
