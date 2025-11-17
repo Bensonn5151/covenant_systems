@@ -88,3 +88,10 @@ models/downloads/
 *.tmp
 *.temp
 .cache/
+
+dashboard/storage/
+storage/vector_db
+storage/bronze
+storage/silver
+storage/gold
+storage/hybrid
