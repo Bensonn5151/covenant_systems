@@ -19,6 +19,7 @@ from ingestion.extract.pdf_extractor import PDFExtractor
 from ingestion.extract.bilingual_extractor import BilingualExtractor
 from ingestion.ocr.ocr_processor import OCRProcessor
 from ingestion.segment.section_segmenter import SectionSegmenter
+from ingestion.classify.document_classifier import DocumentClassifier
 
 
 class IngestionPipeline:
@@ -28,6 +29,7 @@ class IngestionPipeline:
         self,
         bronze_path: str = "storage/bronze",
         silver_path: str = "storage/silver",
+        taxonomy_path: str = "configs/taxonomy.yaml",
     ):
         """
         Initialize ingestion pipeline.
@@ -35,6 +37,7 @@ class IngestionPipeline:
         Args:
             bronze_path: Path to bronze storage (raw)
             silver_path: Path to silver storage (structured)
+            taxonomy_path: Path to taxonomy configuration
         """
         self.bronze_path = Path(bronze_path)
         self.silver_path = Path(silver_path)
@@ -44,6 +47,7 @@ class IngestionPipeline:
         self.bilingual_extractor = BilingualExtractor()
         self.ocr_processor = OCRProcessor()
         self.segmenter = SectionSegmenter()
+        self.classifier = DocumentClassifier(taxonomy_path=taxonomy_path)
 
         # Ensure storage paths exist
         self.bronze_path.mkdir(parents=True, exist_ok=True)
@@ -56,18 +60,28 @@ class IngestionPipeline:
         document_type: Optional[str] = None,
         jurisdiction: str = "unknown",
         is_bilingual: bool = False,
+        manual_category: Optional[str] = None,
+        regulator: Optional[str] = None,
+        parent_act: Optional[str] = None,
+        company_id: Optional[str] = None,
     ) -> Dict:
         """
         Process a document through the full pipeline.
 
         Bronze: Extract text (with OCR if needed)
         Silver: Segment into structured sections
+        Classification: Auto-detect category or use manual override
 
         Args:
             pdf_path: Path to PDF file
             document_id: Optional document ID
             document_type: Type of document (Act, Regulation, etc.)
             jurisdiction: Jurisdiction (Canada, US, etc.)
+            is_bilingual: Whether PDF has dual columns (EN/FR)
+            manual_category: Manual category override (act, regulation, guidance, policy)
+            regulator: Regulator code (for guidance documents)
+            parent_act: Parent act (for regulations)
+            company_id: Company ID (for policies)
 
         Returns:
             Dictionary with processing results
@@ -111,11 +125,31 @@ class IngestionPipeline:
             print(f"  ✓ Pages: {extraction_metadata['page_count']}")
             print(f"  ✓ Needs OCR: {needs_ocr}")
 
-        # Save to Bronze (raw extraction)
+        # ============================================
+        # CLASSIFICATION: Manual category (required for MVP)
+        # ============================================
+        if not manual_category:
+            raise ValueError("manual_category is required. Please specify: act, regulation, guidance, or policy")
+
+        category = manual_category
+        print(f"\n✓ Document Category: {category}")
+
+        # Print category-specific info
+        if regulator:
+            print(f"  ✓ Regulator: {regulator}")
+        if parent_act:
+            print(f"  ✓ Parent Act: {parent_act}")
+        if company_id:
+            print(f"  ✓ Company ID: {company_id}")
+
+        # Save to Bronze (raw extraction) with taxonomy-based path
         bronze_result = self._save_to_bronze(
             document_id=document_id,
             text=extracted_text,
             metadata=extraction_metadata,
+            category=category,
+            regulator=regulator,
+            company_id=company_id,
         )
         print(f"  ✓ Saved to Bronze: {bronze_result['bronze_file']}")
 
@@ -136,11 +170,14 @@ class IngestionPipeline:
                 print(f"  ✓ OCR completed: {len(final_text)} characters")
                 print(f"  ✓ Average confidence: {avg_confidence:.2f}%")
 
-                # Save OCR result to Bronze
+                # Save OCR result to Bronze (with same taxonomy params)
                 ocr_bronze_result = self._save_to_bronze(
                     document_id=f"{document_id}_ocr",
                     text=final_text,
                     metadata=ocr_result["metadata"],
+                    category=category,
+                    regulator=regulator,
+                    company_id=company_id,
                 )
                 print(f"  ✓ Saved OCR to Bronze: {ocr_bronze_result['bronze_file']}")
         else:
@@ -158,7 +195,16 @@ class IngestionPipeline:
             "jurisdiction": jurisdiction,
             "source_file": str(pdf_path),
             "processed_date": datetime.utcnow().isoformat(),
+            "category": category,
         }
+
+        # Add category-specific metadata
+        if regulator:
+            section_metadata["regulator"] = regulator
+        if parent_act:
+            section_metadata["parent_act"] = parent_act
+        if company_id:
+            section_metadata["company_id"] = company_id
 
         sections = self.segmenter.segment(
             text=final_text,
@@ -171,11 +217,14 @@ class IngestionPipeline:
         # Convert sections to dictionaries
         section_dicts = [section.to_dict() for section in sections]
 
-        # Save to Silver (structured sections)
+        # Save to Silver (structured sections) with taxonomy-based path
         silver_result = self._save_to_silver(
             document_id=document_id,
             sections=section_dicts,
             metadata=section_metadata,
+            category=category,
+            regulator=regulator,
+            company_id=company_id,
         )
         print(f"  ✓ Saved to Silver: {silver_result['silver_file']}")
 
@@ -198,6 +247,10 @@ class IngestionPipeline:
             "sections_count": len(sections),
             "needs_ocr": needs_ocr,
             "total_chars": len(final_text),
+            "category": category,
+            "regulator": regulator,
+            "parent_act": parent_act,
+            "company_id": company_id,
         }
 
     def _save_to_bronze(
@@ -205,20 +258,39 @@ class IngestionPipeline:
         document_id: str,
         text: str,
         metadata: Dict,
+        category: Optional[str] = None,
+        regulator: Optional[str] = None,
+        company_id: Optional[str] = None,
     ) -> Dict:
         """
-        Save to Bronze layer (raw text + metadata).
+        Save to Bronze layer (raw text + metadata) with taxonomy-based path.
 
         Args:
             document_id: Document ID
             text: Raw extracted text
             metadata: Extraction metadata
+            category: Document category (act, regulation, guidance, policy)
+            regulator: Regulator code (for guidance documents)
+            company_id: Company ID (for policies)
 
         Returns:
             Dict with file paths
         """
-        # Create document directory
-        doc_dir = self.bronze_path / document_id
+        # Determine taxonomy-based path
+        if category:
+            # Use defaults for None values to prevent path errors
+            storage_path = self.classifier.get_storage_path(
+                category=category,
+                document_id=document_id,
+                layer="bronze",
+                regulator=regulator or "unknown",
+                company_id=company_id or "default",
+            )
+            doc_dir = Path(storage_path)
+        else:
+            # Fallback to flat structure if no category
+            doc_dir = self.bronze_path / document_id
+
         doc_dir.mkdir(parents=True, exist_ok=True)
 
         # Save raw text
@@ -240,20 +312,39 @@ class IngestionPipeline:
         document_id: str,
         sections: list,
         metadata: Dict,
+        category: Optional[str] = None,
+        regulator: Optional[str] = None,
+        company_id: Optional[str] = None,
     ) -> Dict:
         """
-        Save to Silver layer (structured sections).
+        Save to Silver layer (structured sections) with taxonomy-based path.
 
         Args:
             document_id: Document ID
             sections: List of section dictionaries
             metadata: Document metadata
+            category: Document category (act, regulation, guidance, policy)
+            regulator: Regulator code (for guidance documents)
+            company_id: Company ID (for policies)
 
         Returns:
             Dict with file paths
         """
-        # Create document directory
-        doc_dir = self.silver_path / document_id
+        # Determine taxonomy-based path
+        if category:
+            # Use defaults for None values to prevent path errors
+            storage_path = self.classifier.get_storage_path(
+                category=category,
+                document_id=document_id,
+                layer="silver",
+                regulator=regulator or "unknown",
+                company_id=company_id or "default",
+            )
+            doc_dir = Path(storage_path)
+        else:
+            # Fallback to flat structure if no category
+            doc_dir = self.silver_path / document_id
+
         doc_dir.mkdir(parents=True, exist_ok=True)
 
         # Save sections
