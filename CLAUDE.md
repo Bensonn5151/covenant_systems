@@ -345,7 +345,143 @@ Every document has:
 This ensures reproducibility.
 
 
-## 11. We can work with an MVP then scale up from there: 
+## 11. KNOWLEDGE GRAPH ARCHITECTURE
+
+The Knowledge Graph (KG) is a critical component that maps relationships between regulations, sections, and policies.
+
+### 11.1 Purpose
+
+The KG enables:
+	•	Cross-document navigation (e.g., Bank Act → OSFI B-13 → Internal Policy)
+	•	Automatic relationship detection (cites, requires, conflicts_with)
+	•	Context expansion during retrieval
+	•	Gap analysis (find missing policy coverage)
+	•	Impact analysis (what changes if regulation X is amended?)
+
+### 11.2 Storage Format: YAML
+
+Why YAML?
+	•	Human-readable and editable
+	•	Version-controllable (Git-friendly)
+	•	LLM-interpretable (Claude can read/write it)
+	•	Easy schema validation
+	•	Can export to RDF/Neo4j if needed
+
+### 11.3 Node Types
+
+nodes.yaml contains:
+	•	regulation: Sections from acts/regulations
+	•	clause: Specific clauses/subsections
+	•	obligation: Extracted requirements
+	•	prohibition: Extracted restrictions
+	•	permission: Extracted allowances
+	•	definition: Legal term definitions
+	•	control: Internal controls/procedures
+	•	policy: Company policies
+
+Example node:
+```yaml
+- id: "BA-6-1"
+  type: "regulation"
+  source_document: "Bank Act (Canada)"
+  section: "6(1)"
+  text: "A bank shall not carry on business as a bank, except in accordance with this Act."
+  domains: ["banking", "licensing"]
+  metadata:
+    jurisdiction: "Canada"
+    regulator: "OSFI"
+    risk_level: "high"
+    enforceable: true
+    effective_date: "2024-01-01"
+```
+
+### 11.4 Edge Types
+
+edges.yaml contains relationships:
+	•	cites: Section A references Section B
+	•	requires: Section A mandates compliance with Section B
+	•	implements: Policy implements regulation
+	•	conflicts_with: Potential conflict detected
+	•	supersedes: New regulation replaces old one
+	•	amends: Regulation modifies another
+	•	references: General reference/mention
+
+Example edge:
+```yaml
+- from: "BA-6-1"
+  to: "PCMLTFA-9"
+  type: "requires_alignment"
+  description: "Bank licensing triggers AML compliance requirements under PCMLTFA"
+  confidence: 0.87
+  source: "legal_analysis"
+  date_created: "2024-11-16"
+```
+
+### 11.5 Domain Taxonomy
+
+domains.yaml defines compliance areas:
+```yaml
+domains:
+  - name: "Anti-Money Laundering (AML)"
+    abbreviation: "AML"
+    regulators: ["FINTRAC", "FinCEN"]
+    applicable_jurisdictions: ["Canada", "United States"]
+    related_acts: ["PCMLTFA", "Bank Secrecy Act"]
+
+  - name: "Privacy & Data Protection"
+    abbreviation: "Privacy"
+    regulators: ["OPC", "ICO", "CNIL"]
+    applicable_jurisdictions: ["Canada", "UK", "EU"]
+    related_acts: ["PIPEDA", "GDPR", "UK DPA"]
+```
+
+### 11.6 KG Construction Pipeline
+
+```
+Silver Sections → Entity Extraction → Relationship Detection → KG Nodes/Edges
+                   (LLM/NER)           (Rule-based + LLM)
+```
+
+Steps:
+1. Extract entities (sections, references, dates)
+2. Detect relationships (regex patterns + LLM analysis)
+3. Generate KG entries (YAML format)
+4. Validate schema (ensure no broken edges)
+5. Embed KG nodes for semantic search
+
+### 11.7 KG-Enhanced Retrieval
+
+```
+User Query → Vector Search → Retrieve Top-K sections
+                ↓
+           KG Expansion (follow edges: cites, requires)
+                ↓
+           Add neighbor nodes for context
+                ↓
+           Return enriched results with relationships
+```
+
+### 11.8 KG Maintenance Rules
+
+Claude must:
+	•	Validate all edges (ensure 'from' and 'to' nodes exist)
+	•	Prevent circular dependencies
+	•	Log confidence scores for auto-generated edges (<0.75 = uncertain)
+	•	Allow manual review/override of low-confidence edges
+	•	Version the KG (track changes over time)
+	•	Never create relationships that don't exist
+
+### 11.9 Export Formats
+
+The KG can be exported to:
+	•	Neo4j (property graph database)
+	•	RDF/Turtle (semantic web standard)
+	•	GraphML (graph visualization tools)
+	•	JSON-LD (linked data format)
+
+⸻
+
+## 12. We can work with an MVP then scale up from there: 
 /
 ├── data/
 |---regulations/
