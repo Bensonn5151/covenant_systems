@@ -183,32 +183,110 @@ Gold (Semantic Intelligence Layer)
 
 Knowledge Graph is stored in YAML for readability, flexibility, and LLM interpretability.
 
+### Purpose
+
+The Knowledge Graph enables:
+- **Cross-document navigation**: Bank Act → OSFI Guidelines → Internal Policies
+- **Relationship detection**: cites, requires, implements, conflicts_with
+- **Context expansion**: During retrieval, follow edges to find related sections
+- **Gap analysis**: Find missing policy coverage
+- **Impact analysis**: What changes if regulation X is amended?
+
+### Node Types
+
+The graph supports multiple node types:
+- **regulation**: Sections from acts/regulations
+- **clause**: Specific clauses/subsections
+- **obligation**: Extracted requirements
+- **prohibition**: Extracted restrictions
+- **permission**: Extracted allowances
+- **definition**: Legal term definitions
+- **control**: Internal controls/procedures
+- **policy**: Company policies
+
 ### nodes.yaml
 
 Contains every regulatory and policy node.
+```yaml
 - id: BA-6-1
   type: regulation
-  act: "Bank Act"
+  source_document: "Bank Act (Canada)"
   section: "6(1)"
-  domain: ["banking", "licensing"]
-  text: "A bank shall not..."
+  text: "A bank shall not carry on business as a bank, except in accordance with this Act."
+  domains: ["banking", "licensing"]
   metadata:
+    jurisdiction: "Canada"
+    regulator: "OSFI"
     risk_level: high
     enforceable: true
+    effective_date: "2024-01-01"
+```
 
 ### edges.yaml
 
 Represents cross-references and semantic/legal relationships.
 
+```yaml
 - from: BA-6-1
   to: PCMLTFA-9
   type: requires_alignment
-  description: "Licensing triggers AML requirements."
+  description: "Bank licensing triggers AML compliance requirements under PCMLTFA"
+  confidence: 0.87
+  source: "legal_analysis"
+  date_created: "2024-11-16"
+```
 
+**Relationship Types:**
+- `cites`: Section A references Section B
+- `requires`: Section A mandates compliance with Section B
+- `implements`: Policy implements regulation
+- `conflicts_with`: Potential conflict detected
+- `supersedes`: New regulation replaces old one
+- `amends`: Regulation modifies another
 
 ### domains.yaml
 
-Domain taxonomy used for enrichment.
+Domain taxonomy used for compliance area classification.
+
+```yaml
+domains:
+  - name: "Anti-Money Laundering (AML)"
+    abbreviation: "AML"
+    regulators: ["FINTRAC", "FinCEN"]
+    applicable_jurisdictions: ["Canada", "United States"]
+    related_acts: ["PCMLTFA", "Bank Secrecy Act"]
+
+  - name: "Privacy & Data Protection"
+    abbreviation: "Privacy"
+    regulators: ["OPC", "ICO", "CNIL"]
+    applicable_jurisdictions: ["Canada", "UK", "EU"]
+    related_acts: ["PIPEDA", "GDPR", "UK DPA"]
+```
+
+### KG Construction Pipeline
+
+```
+Silver Sections → Entity Extraction → Relationship Detection → KG Nodes/Edges
+                   (LLM/NER)           (Rule-based + LLM)
+```
+
+1. Extract entities (sections, references, dates)
+2. Detect relationships (regex patterns + LLM analysis)
+3. Generate KG entries (YAML format)
+4. Validate schema (ensure no broken edges)
+5. Embed KG nodes for semantic search
+
+### KG-Enhanced Retrieval
+
+```
+User Query → Vector Search → Retrieve Top-K sections
+                ↓
+           KG Expansion (follow edges: cites, requires)
+                ↓
+           Add neighbor nodes for context
+                ↓
+           Return enriched results with relationships
+```
 
 ## 6. Retrieval Architecture
 
