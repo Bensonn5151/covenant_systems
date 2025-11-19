@@ -1,0 +1,196 @@
+# Document Taxonomy Configuration
+# Defines categories, regulators, hierarchies, and classification rules
+
+# Document Categories
+categories:
+  act:
+    name: "Acts (Primary Legislation)"
+    description: "Federal and provincial acts (primary legislation)"
+    examples: ["Bank Act", "PCMLTFA", "PIPEDA"]
+    storage_path: "acts"
+
+  regulation:
+    name: "Regulations (Secondary Legislation)"
+    description: "Regulations made under acts"
+    examples: ["Bank Act Regulations", "PCMLTFA Regulations"]
+    storage_path: "regulations"
+    requires_parent: true
+
+  guidance:
+    name: "Regulator Guidance"
+    description: "Guidelines, advisories, and guidance from regulators"
+    examples: ["OSFI B-13", "FINTRAC Guidelines"]
+    storage_path: "guidance"
+    requires_regulator: true
+
+  policy:
+    name: "Company Policies"
+    description: "Internal organizational policies and procedures"
+    examples: ["AML Policy", "Privacy Policy"]
+    storage_path: "company_policies"
+    requires_company_id: true
+
+# Regulators
+regulators:
+  OSFI:
+    full_name: "Office of the Superintendent of Financial Institutions"
+    jurisdiction: "federal"
+    sector: "financial"
+    keywords: ["OSFI", "Superintendent", "Financial Institutions"]
+
+  FINTRAC:
+    full_name: "Financial Transactions and Reports Analysis Centre"
+    jurisdiction: "federal"
+    sector: "aml"
+    keywords: ["FINTRAC", "Money Laundering", "Terrorist Financing"]
+
+  OPC:
+    full_name: "Office of the Privacy Commissioner"
+    jurisdiction: "federal"
+    sector: "privacy"
+    keywords: ["OPC", "Privacy Commissioner", "Personal Information"]
+
+  FCAC:
+    full_name: "Financial Consumer Agency of Canada"
+    jurisdiction: "federal"
+    sector: "consumer_protection"
+    keywords: ["FCAC", "Consumer Agency", "Financial Consumer"]
+
+# Primary Acts (for hierarchy tracking)
+acts:
+  bank_act:
+    full_title: "Bank Act"
+    short_name: "Bank Act"
+    jurisdiction: "federal"
+    regulator: "OSFI"
+    keywords: ["Bank Act", "S.C. 1991"]
+
+  pcmltfa:
+    full_title: "Proceeds of Crime (Money Laundering) and Terrorist Financing Act"
+    short_name: "PCMLTFA"
+    jurisdiction: "federal"
+    regulator: "FINTRAC"
+    keywords: ["PCMLTFA", "Proceeds of Crime", "Money Laundering", "S.C. 2000"]
+
+  pipeda:
+    full_title: "Personal Information Protection and Electronic Documents Act"
+    short_name: "PIPEDA"
+    jurisdiction: "federal"
+    regulator: "OPC"
+    keywords: ["PIPEDA", "Personal Information Protection", "S.C. 2000"]
+
+# Classification Rules
+classification_rules:
+  # Title-based classification
+  title_patterns:
+    act:
+      - "Act$"
+      - "^[A-Z].*Act$"
+      - "S\\.C\\. \\d{4}"  # Statutes of Canada format
+
+    regulation:
+      - "Regulations?$"
+      - "Rules?$"
+      - "SOR/"  # Statutory Orders and Regulations
+
+    guidance:
+      - "Guideline"
+      - "Advisory"
+      - "Notice"
+      - "^B-\\d+"  # OSFI B-series
+      - "^E-\\d+"  # OSFI E-series
+
+  # Content-based classification
+  content_patterns:
+    act:
+      - "Her Majesty"
+      - "enactment"
+      - "coming into force"
+
+    regulation:
+      - "pursuant to"
+      - "under section"
+      - "Governor in Council"
+
+  # Regulator detection
+  regulator_patterns:
+    OSFI:
+      - "Office of the Superintendent"
+      - "Superintendent of Financial Institutions"
+      - "osfi-bsif"
+
+    FINTRAC:
+      - "Financial Transactions and Reports"
+      - "FINTRAC"
+      - "CANAFE"
+
+    OPC:
+      - "Privacy Commissioner"
+      - "OPC"
+      - "priv.gc.ca"
+
+    FCAC:
+      - "Financial Consumer Agency"
+      - "FCAC"
+      - "ACFC"
+
+# Jurisdictions
+jurisdictions:
+  federal:
+    name: "Federal (Canada)"
+    authority: "Parliament of Canada"
+
+  provincial:
+    name: "Provincial/Territorial"
+    provinces:
+      - "Ontario"
+      - "Quebec"
+      - "British Columbia"
+      - "Alberta"
+      # ... etc
+
+  internal:
+    name: "Internal/Organizational"
+    description: "Company-level policies"
+
+# Metadata Schema
+metadata_schema:
+  required_fields:
+    - doc_id
+    - category
+    - title
+    - version
+    - ingested_at
+
+  optional_fields:
+    - jurisdiction
+    - parent_act
+    - regulator
+    - source_type
+    - file_hash
+    - page_count
+    - section_count
+
+  category_specific:
+    regulation:
+      required:
+        - parent_act
+    guidance:
+      required:
+        - regulator
+    policy:
+      required:
+        - company_id
+
+# Auto-splitting Rules (for PDFs containing multiple document types)
+auto_split_rules:
+  enabled: true
+
+  split_on:
+    - pattern: "^REGULATIONS?$"
+      new_category: "regulation"
+
+    - pattern: "^SCHEDULE [A-Z0-9]+"
+      keep_with_parent: true
+
+  preserve_hierarchy: true
