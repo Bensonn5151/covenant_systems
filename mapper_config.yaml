@@ -1,0 +1,37 @@
+# Legislative Mapper Configuration
+# Add act and regulation slugs here to map them automatically
+#
+# The system automatically organizes files:
+#   - Acts → data/raw/acts/
+#   - Regulations → data/raw/regulations/
+
+# Acts to map (will also discover related regulations)
+acts:
+  - "Bank Act"
+  - "Proceeds of Crime (Money Laundering) and Terrorist Financing Act"
+  - "Personal Information Protection and Electronic Documents Act"
+  # Add more acts here as you discover them
+  # - "Privacy Act"
+  # - "Access to Information Act"
+
+# Act slugs (alternative to act names)
+act_slugs:
+  - #"B-1.01"          # Bank Act
+  - "P-24.501"        # PCMLTFA
+  - "P-8.6"           # PIPEDA
+  - "C-3"             # Canada Deposit Insurance Corporation Act (for SOR-2018-57)
+  # Add more act slugs here
+  # - "P-21"          # Privacy Act
+  # - "A-1"           # Access to Information Act
+
+# Specific regulations to map (if not auto-discovered from acts)
+regulation_slugs:
+  - "SOR-2021-181"
+  - "SOR-2018-57"
+  - "SOR-2018-58"
+  - "SOR-2002-184"
+  - "SOR-2001-317"
+  - "SOR-2018-64"
+  # Add more regulation slugs here as you find them
+  # Example:
+  # - "SOR-2016-153"  # PCMLTFA Regulations
