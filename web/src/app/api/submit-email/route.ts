@@ -1,37 +1,11 @@
+import { Client } from '@notionhq/client';
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
 
-// GET endpoint to view all submitted emails
-export async function GET() {
-  try {
-    // Create table if it doesn't exist
-    await sql`
-      CREATE TABLE IF NOT EXISTS email_submissions (
-        id SERIAL PRIMARY KEY,
-        email VARCHAR(255) NOT NULL,
-        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        status VARCHAR(50) DEFAULT 'New'
-      );
-    `;
+const notion = new Client({
+  auth: process.env.NOTION_TOKEN,
+});
 
-    const { rows } = await sql`
-      SELECT id, email, submitted_at, status
-      FROM email_submissions
-      ORDER BY submitted_at DESC;
-    `;
-
-    return NextResponse.json(
-      { success: true, emails: rows, count: rows.length },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error('Error fetching emails:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch emails' },
-      { status: 500 }
-    );
-  }
-}
+const databaseId = process.env.NOTION_DATABASE_ID!;
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,28 +27,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create table if it doesn't exist
-    await sql`
-      CREATE TABLE IF NOT EXISTS email_submissions (
-        id SERIAL PRIMARY KEY,
-        email VARCHAR(255) NOT NULL,
-        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        status VARCHAR(50) DEFAULT 'New'
-      );
-    `;
-
-    // Insert email into database
-    await sql`
-      INSERT INTO email_submissions (email, submitted_at, status)
-      VALUES (${email}, NOW(), 'New');
-    `;
+    // Add to Notion database - using "Name" property (default title property)
+    await notion.pages.create({
+      parent: {
+        database_id: databaseId,
+      },
+      properties: {
+        Name: {
+          title: [
+            {
+              text: {
+                content: email,
+              },
+            },
+          ],
+        },
+      },
+    });
 
     return NextResponse.json(
       { success: true, message: 'Email submitted successfully' },
       { status: 200 }
     );
   } catch (error) {
-    console.error('Error submitting email:', error);
+    console.error('Error submitting to Notion:', error);
     return NextResponse.json(
       { error: 'Failed to submit email' },
       { status: 500 }
