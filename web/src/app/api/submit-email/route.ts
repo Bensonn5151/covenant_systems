@@ -1,6 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, readFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { sql } from '@vercel/postgres';
+
+// GET endpoint to view all submitted emails
+export async function GET() {
+  try {
+    // Create table if it doesn't exist
+    await sql`
+      CREATE TABLE IF NOT EXISTS email_submissions (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(50) DEFAULT 'New'
+      );
+    `;
+
+    const { rows } = await sql`
+      SELECT id, email, submitted_at, status
+      FROM email_submissions
+      ORDER BY submitted_at DESC;
+    `;
+
+    return NextResponse.json(
+      { success: true, emails: rows, count: rows.length },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error('Error fetching emails:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch emails' },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,33 +53,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Save to JSON file
-    const dataDir = join(process.cwd(), 'data');
-    const filePath = join(dataDir, 'emails.json');
+    // Create table if it doesn't exist
+    await sql`
+      CREATE TABLE IF NOT EXISTS email_submissions (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(50) DEFAULT 'New'
+      );
+    `;
 
-    try {
-      await mkdir(dataDir, { recursive: true });
-    } catch (err) {
-      // Directory might already exist
-    }
-
-    let emails = [];
-    try {
-      const fileContent = await readFile(filePath, 'utf-8');
-      emails = JSON.parse(fileContent);
-    } catch (err) {
-      // File doesn't exist yet, start with empty array
-    }
-
-    // Add new email
-    emails.push({
-      email,
-      submittedAt: new Date().toISOString(),
-      status: 'New',
-    });
-
-    // Write back to file
-    await writeFile(filePath, JSON.stringify(emails, null, 2));
+    // Insert email into database
+    await sql`
+      INSERT INTO email_submissions (email, submitted_at, status)
+      VALUES (${email}, NOW(), 'New');
+    `;
 
     return NextResponse.json(
       { success: true, message: 'Email submitted successfully' },
