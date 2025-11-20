@@ -1,0 +1,78 @@
+nodes:
+- id: bank_act sc1991_c_46
+  type: act
+  title: Bank Act (S.C.1991, c. 46)
+  filename: S.C.1991, c. 46 - Bank Act.pdf
+  metadata:
+    jurisdiction: federal
+    citation: S.C.1991, c. 46
+- id: proceeds_of_crime_money_laundering_and_terrorist_f
+  type: act
+  title: Proceeds of Crime (Money Laundering) and Terrorist Financing Act (S.C.2000,
+    c. 17)
+  filename: S.C.2000, c. 17 - Proceeds of Crime (Money Laundering) and Terrorist Financing
+    Act.pdf
+  metadata:
+    jurisdiction: federal
+    citation: S.C.2000, c. 17
+- id: personal_information_protection_and_electronic_doc
+  type: act
+  title: Personal Information Protection and Electronic Documents Act (S.C.2000, c.
+    5)
+  filename: S.C.2000, c. 5 - Personal Information Protection and Electronic Documents
+    Act.pdf
+  metadata:
+    jurisdiction: federal
+    citation: S.C.2000, c. 5
+- id: financial_consumer_protection_framework_regulation
+  type: regulation
+  title: Financial Consumer Protection Framework Regulations (SOR/2021-181)
+  filename: SOR-2021-181 - Financial Consumer Protection Framework Regulations.pdf
+  metadata:
+    jurisdiction: federal
+    citation: SOR/2021-181
+- id: bank_recapitalization_bail_in_conversion_regulatio
+  type: regulation
+  title: Bank Recapitalization (Bail-in) Conversion Regulations (SOR/2018-57)
+  filename: SOR-2018-57 - Bank Recapitalization (Bail-in) Conversion Regulations.pdf
+  metadata:
+    jurisdiction: federal
+    citation: SOR/2018-57
+- id: bank_recapitalization_bail_in_issuance_regulations
+  type: regulation
+  title: Bank Recapitalization (Bail-in) Issuance Regulations (SOR/2018-58)
+  filename: SOR-2018-58 - Bank Recapitalization (Bail-in) Issuance Regulations.pdf
+  metadata:
+    jurisdiction: federal
+    citation: SOR/2018-58
+- id: proceeds_of_crime_money_laundering_and_terrorist_f
+  type: regulation
+  title: Proceeds of Crime (Money Laundering) and Terrorist Financing Regulations (SOR/2002-184)
+  filename: SOR-2002-184 - Proceeds of Crime (Money Laundering) and Terrorist Financing
+    Regulations.pdf
+  metadata:
+    jurisdiction: federal
+    citation: SOR/2002-184
+- id: proceeds_of_crime_money_laundering_and_terrorist_f
+  type: regulation
+  title: Proceeds of Crime (Money Laundering) and Terrorist Financing Suspicious Transaction
+    Reporting Regulations (SOR/2001-317)
+  filename: SOR-2001-317 - Proceeds of Crime (Money Laundering) and Terrorist Financing
+    Suspicious Transaction Reporting Regulations.pdf
+  metadata:
+    jurisdiction: federal
+    citation: SOR/2001-317
+- id: breach_of_security_safeguards_regulations sor/2018
+  type: regulation
+  title: Breach of Security Safeguards Regulations (SOR/2018-64)
+  filename: SOR-2018-64 - Breach of Security Safeguards Regulations.pdf
+  metadata:
+    jurisdiction: federal
+    citation: SOR/2018-64
+- id: canada_deposit_insurance_corporation_act rsc_1985_
+  type: act
+  title: Canada Deposit Insurance Corporation Act (R.S.C., 1985, c. C-3)
+  filename: R.S.C., 1985, c. C-3 - Canada Deposit Insurance Corporation Act.pdf
+  metadata:
+    jurisdiction: federal
+    citation: R.S.C., 1985, c. C-3

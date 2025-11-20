@@ -1,0 +1,129 @@
+# Knowledge Graph Ontology
+# Defines the schema for nodes, edges, and properties in the regulatory graph.
+
+# ==========================================
+# 1. Node Types (Entities)
+# ==========================================
+node_types:
+  # --- Regulatory Entities ---
+  regulation:
+    description: "A full act or regulation (e.g., Bank Act)"
+    properties:
+      - id: string (unique)
+      - title: string
+      - jurisdiction: string
+      - regulator: string
+      - effective_date: date
+
+  section:
+    description: "A specific section within a regulation (e.g., Section 6(1))"
+    properties:
+      - id: string (unique)
+      - section_number: string
+      - text: string (verbatim)
+      - embedding: vector[384]
+
+  definition:
+    description: "A defined legal term (e.g., 'deposit-taking institution')"
+    properties:
+      - term: string
+      - definition_text: string
+      - source_section: string (ref)
+
+  # --- Compliance Entities ---
+  obligation:
+    description: "A mandatory requirement extracted from text (MUST/SHALL)"
+    properties:
+      - description: string
+      - risk_level: enum[low, medium, high, critical]
+      - penalty: string (optional)
+
+  prohibition:
+    description: "An explicit restriction (MUST NOT/SHALL NOT)"
+    properties:
+      - description: string
+      - risk_level: enum[low, medium, high, critical]
+
+  permission:
+    description: "An allowance or right (MAY/CAN)"
+    properties:
+      - description: string
+
+  # --- Operational Entities ---
+  policy:
+    description: "Internal company policy document"
+    properties:
+      - id: string
+      - title: string
+      - owner: string
+      - last_review: date
+
+  control:
+    description: "Internal control or procedure implementing a policy"
+    properties:
+      - id: string
+      - description: string
+      - type: enum[preventative, detective, corrective]
+      - frequency: enum[daily, weekly, monthly, annual]
+
+# ==========================================
+# 2. Edge Types (Relationships)
+# ==========================================
+edge_types:
+  # --- Structural Relationships ---
+  contains:
+    description: "Hierarchical containment (Regulation -> Section)"
+    from: [regulation, section]
+    to: [section, clause]
+
+  defines:
+    description: "Section defines a term"
+    from: [section]
+    to: [definition]
+
+  # --- Semantic Relationships ---
+  cites:
+    description: "Explicit citation (Section A mentions Section B)"
+    from: [section]
+    to: [section, regulation]
+
+  requires_alignment:
+    description: "Implicit dependency (e.g., Banking license requires AML compliance)"
+    from: [section]
+    to: [section]
+
+  conflicts_with:
+    description: "Contradictory requirements"
+    from: [section, policy]
+    to: [section, policy]
+
+  # --- Compliance Mappings ---
+  implements:
+    description: "Policy/Control satisfies a Regulation"
+    from: [policy, control]
+    to: [regulation, section, obligation]
+
+  mitigates:
+    description: "Control reduces a specific Risk"
+    from: [control]
+    to: [obligation, prohibition]
+
+# ==========================================
+# 3. Domain Taxonomy (Tags)
+# ==========================================
+domains:
+  - id: AML
+    name: "Anti-Money Laundering"
+    keywords: [laundering, terrorist financing, kyc, fintrac]
+  
+  - id: PRIVACY
+    name: "Privacy & Data Protection"
+    keywords: [personal information, consent, breach, pipeda]
+  
+  - id: CYBER
+    name: "Cybersecurity"
+    keywords: [encryption, incident response, access control]
+  
+  - id: CONSUMER
+    name: "Consumer Protection"
+    keywords: [disclosure, complaint, fee, fcac]
