@@ -44,6 +44,7 @@ env/
 # Data Files
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/manifest.yaml
 data/processed/*
 !data/processed/.gitkeep
 storage/bronze/*
@@ -99,3 +100,4 @@ storage/hybrid
 
 PDFServicesSDK/
 requirements_backup.txt
+clear_storage.py
