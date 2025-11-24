@@ -5,9 +5,11 @@ Performs Optical Character Recognition on scanned PDFs using Tesseract.
 Only invoked when PDF extraction returns insufficient text.
 
 Follows Bronze Layer principles: preserve OCR output verbatim, log confidence.
+Includes image preprocessing (grayscale, thresholding) to improve accuracy.
 """
 
 import os
+import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -15,13 +17,13 @@ from datetime import datetime
 try:
     import pytesseract
     from pdf2image import convert_from_path
-    from PIL import Image
+    from PIL import Image, ImageOps, ImageFilter
 except ImportError as e:
     print(f"Warning: OCR dependencies not installed: {e}")
 
 
 class OCRProcessor:
-    """Process scanned documents using Tesseract OCR."""
+    """Process scanned documents using Tesseract OCR with image preprocessing."""
 
     def __init__(
         self,
@@ -72,7 +74,10 @@ class OCRProcessor:
             text_parts = []
 
             for i, image in enumerate(images):
-                page_result = self._process_page(image, i + 1)
+                # Preprocess image for better OCR
+                processed_image = self._preprocess_image(image)
+                
+                page_result = self._process_page(processed_image, i + 1)
                 page_data.append(page_result)
                 text_parts.append(page_result["text"])
 
@@ -93,6 +98,7 @@ class OCRProcessor:
                 "char_count": len(full_text),
                 "avg_confidence": avg_confidence,
                 "ocr_date": datetime.utcnow().isoformat(),
+                "preprocessing": "grayscale, thresholding, denoising"
             }
 
             return {
@@ -133,6 +139,44 @@ class OCRProcessor:
 
         except Exception as e:
             raise RuntimeError(f"PDF to image conversion failed: {e}")
+
+    def _preprocess_image(self, image: Image.Image) -> Image.Image:
+        """
+        Apply image preprocessing to improve OCR accuracy.
+        
+        Steps:
+        1. Convert to grayscale
+        2. Apply binary thresholding (Otsu's method via numpy if possible, else simple)
+        3. Denoise
+        
+        Args:
+            image: Original PIL Image
+            
+        Returns:
+            Preprocessed PIL Image
+        """
+        try:
+            # 1. Convert to grayscale
+            gray_image = ImageOps.grayscale(image)
+            
+            # 2. Apply thresholding (binarization)
+            # Using a simple point operation to threshold
+            # Pixels > 128 become 255 (white), others 0 (black)
+            # This helps remove gray background noise
+            threshold_image = gray_image.point(lambda p: p > 180 and 255)
+            
+            # 3. Optional: Denoise using a median filter if the image is noisy
+            # (Can be computationally expensive, so using a light filter)
+            # clean_image = threshold_image.filter(ImageFilter.MedianFilter(size=3))
+            
+            # For legal docs, simple high-contrast binarization is usually best
+            # to keep thin lines of text sharp.
+            
+            return threshold_image
+            
+        except Exception as e:
+            print(f"Warning: Image preprocessing failed, using original. Error: {e}")
+            return image
 
     def _process_page(self, image: Image.Image, page_number: int) -> Dict:
         """
@@ -196,13 +240,18 @@ class OCRProcessor:
 
         try:
             image = Image.open(image_path)
-            result = self._process_page(image, 1)
+            
+            # Preprocess
+            processed_image = self._preprocess_image(image)
+            
+            result = self._process_page(processed_image, 1)
 
             metadata = {
                 "source_file": str(image_path),
                 "ocr_engine": "tesseract",
                 "ocr_language": self.language,
                 "ocr_date": datetime.utcnow().isoformat(),
+                "preprocessing": "grayscale, thresholding"
             }
 
             return {

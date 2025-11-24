@@ -17,6 +17,54 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 
 
+def is_toc_section(title: str, body: str = "") -> bool:
+    """
+    Detect Table of Contents sections using multiple heuristics.
+
+    Args:
+        title: Section title
+        body: Section body text (optional, for additional validation)
+
+    Returns:
+        True if section is likely a TOC
+    """
+    title_lower = title.lower().strip()
+
+    # Pattern 1: Exact phrase matching (case-insensitive)
+    TOC_PHRASES = [
+        "table of provisions",
+        "table of contents",
+        "table analytique",
+        "table des matières",
+        "analytical table",
+        "contents",
+        "provisions"
+    ]
+
+    if any(phrase in title_lower for phrase in TOC_PHRASES):
+        return True
+
+    # Pattern 2: Regex for common TOC formats
+    TOC_REGEX = re.compile(
+        r"^(table|contents|provisions|matières|analytique)",
+        re.IGNORECASE
+    )
+
+    if TOC_REGEX.match(title_lower):
+        return True
+
+    # Pattern 3: Short titles that are likely TOC (< 5 words, contains "table")
+    word_count = len(title_lower.split())
+    if word_count <= 5 and "table" in title_lower:
+        return True
+
+    # Pattern 4: Body text heuristic - if body is very short and title suggests TOC
+    if len(body) < 500 and any(kw in title_lower for kw in ["table", "contents", "provisions"]):
+        return True
+
+    return False
+
+
 class SectionType(Enum):
     """Types of legal document sections."""
     PREAMBLE = "preamble"
@@ -396,7 +444,10 @@ class AdvancedSegmenter:
             # Determine parent
             parent_id = self._find_parent(marker, parent_stack)
 
-            # Create section
+            # Create section with TOC detection
+            section_metadata = metadata.copy() if metadata else {}
+            section_metadata["is_toc"] = is_toc_section(title, body)
+
             section = Section(
                 section_id=section_id,
                 section_number=marker.number or f"{i+1}",
@@ -407,7 +458,7 @@ class AdvancedSegmenter:
                 parent_id=parent_id,
                 start_char=start_pos,
                 end_char=end_pos,
-                metadata=metadata or {},
+                metadata=section_metadata,
                 citations=citations,
             )
 

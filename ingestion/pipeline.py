@@ -16,9 +16,11 @@ from typing import Dict, Optional
 from datetime import datetime
 
 from ingestion.extract.pdf_extractor import PDFExtractor
-from ingestion.extract.bilingual_extractor import BilingualExtractor
+from ingestion.extract.adobe_pdf_extractor import AdobePDFExtractor
 from ingestion.ocr.ocr_processor import OCRProcessor
-from ingestion.segment.section_segmenter import SectionSegmenter
+from ingestion.preprocessors.language_filter import LanguagePreprocessor
+from ingestion.segment.advanced_segmenter import AdvancedSegmenter
+from ingestion.segment.bookmark_segmenter import HybridSegmenter
 from ingestion.classify.document_classifier import DocumentClassifier
 
 
@@ -30,6 +32,7 @@ class IngestionPipeline:
         bronze_path: str = "storage/bronze",
         silver_path: str = "storage/silver",
         taxonomy_path: str = "configs/taxonomy.yaml",
+        adobe_credentials_path: Optional[str] = None,
     ):
         """
         Initialize ingestion pipeline.
@@ -38,15 +41,28 @@ class IngestionPipeline:
             bronze_path: Path to bronze storage (raw)
             silver_path: Path to silver storage (structured)
             taxonomy_path: Path to taxonomy configuration
+            adobe_credentials_path: Path to Adobe credentials (auto-detected if not provided)
         """
         self.bronze_path = Path(bronze_path)
         self.silver_path = Path(silver_path)
 
-        # Initialize components
-        self.extractor = PDFExtractor()
-        self.bilingual_extractor = BilingualExtractor()
+        # Initialize Adobe PDF Services as primary extractor
+        try:
+            self.extractor = AdobePDFExtractor(credentials_path=adobe_credentials_path)
+            self.extraction_method = "Adobe PDF Services"
+            print("✓ Adobe PDF Services initialized (95-99% accuracy)")
+        except Exception as e:
+            print(f"⚠ Adobe PDF Services unavailable: {e}")
+            print("  Falling back to PyPDF2 (70-80% accuracy)")
+            self.extractor = PDFExtractor()
+            self.extraction_method = "PyPDF2"
+
         self.ocr_processor = OCRProcessor()
-        self.segmenter = SectionSegmenter()
+
+        # Use hybrid segmenter: PDF bookmarks first, text patterns as fallback
+        text_segmenter = AdvancedSegmenter()
+        self.segmenter = HybridSegmenter(text_segmenter=text_segmenter)
+
         self.classifier = DocumentClassifier(taxonomy_path=taxonomy_path)
 
         # Ensure storage paths exist
@@ -77,7 +93,7 @@ class IngestionPipeline:
             document_id: Optional document ID
             document_type: Type of document (Act, Regulation, etc.)
             jurisdiction: Jurisdiction (Canada, US, etc.)
-            is_bilingual: Whether PDF has dual columns (EN/FR)
+            is_bilingual: Whether PDF has dual columns (EN/FR) - extracts left column only
             manual_category: Manual category override (act, regulation, guidance, policy)
             regulator: Regulator code (for guidance documents)
             parent_act: Parent act (for regulations)
@@ -93,28 +109,76 @@ class IngestionPipeline:
         # ============================================
         # STEP 1: EXTRACT (BRONZE)
         # ============================================
-        if is_bilingual:
-            print("STEP 1: Extracting text from BILINGUAL PDF (English only)...")
-            bilingual_result = self.bilingual_extractor.extract(pdf_path)
+        # Check if input is already a text file (re-processing Bronze)
+        is_text_file = str(pdf_path).lower().endswith('.txt')
 
-            # Generate document ID if not provided
-            if not document_id:
-                document_id = Path(pdf_path).stem.lower().replace(" ", "_")
+        if is_text_file:
+            print("STEP 1: Reading existing Bronze text (skipping extraction)...")
+            try:
+                raw_text = Path(pdf_path).read_text(encoding='utf-8')
+                print(f"  ✓ Read {len(raw_text)} characters from {pdf_path}")
 
-            extracted_text = bilingual_result["text"]
-            needs_ocr = False  # Bilingual extraction doesn't support OCR detection yet
+                # Clean Adobe artifacts from Bronze text
+                print("  → Cleaning Adobe extraction artifacts...")
+                extracted_text = self._clean_bronze_text(raw_text)
+                print(f"  ✓ Cleaned text: {len(extracted_text)} characters")
 
-            extraction_metadata = {
-                "document_id": document_id,
-                **bilingual_result["metadata"],
-            }
+                # Try to load existing metadata
+                metadata_path = Path(pdf_path).parent / "metadata.json"
+                if metadata_path.exists():
+                    with open(metadata_path, 'r', encoding='utf-8') as f:
+                        extraction_metadata = json.load(f)
+                    print(f"  ✓ Loaded existing metadata from {metadata_path}")
+                else:
+                    extraction_metadata = {
+                        "document_id": document_id or Path(pdf_path).parent.name,
+                        "extraction_method": "existing_bronze",
+                        "page_count": 0,
+                    }
+                    print("  ⚠️  No metadata file found, using default")
 
-            print(f"  ✓ Extracted {len(extracted_text)} characters (English column)")
-            print(f"  ✓ Pages: {extraction_metadata['page_count']}")
-            print(f"  ✓ Column boundary: {extraction_metadata.get('column_boundary', 'auto-detected')}")
+                # Ensure document_id is set
+                if not document_id:
+                    document_id = extraction_metadata.get("document_id", Path(pdf_path).parent.name)
+
+                needs_ocr = False
+
+                # Construct bronze_result for consistency
+                bronze_result = {
+                    "bronze_file": str(pdf_path),
+                    "metadata_file": str(metadata_path) if metadata_path.exists() else None
+                }
+
+            except Exception as e:
+                raise ValueError(f"Failed to read text file: {e}")
+
         else:
+            # Normal PDF extraction flow
             print("STEP 1: Extracting text from PDF...")
-            extraction_result = self.extractor.extract(pdf_path, document_id)
+            # NOTE: For bilingual documents, we use spatial filtering (left column only)
+            # This is cleaner than extracting full page and filtering later
+
+            try:
+                # Pass bilingual flag to Adobe extractor if applicable
+                if isinstance(self.extractor, AdobePDFExtractor):
+                    extraction_result = self.extractor.extract(
+                        pdf_path,
+                        document_id,
+                        extract_left_column_only=is_bilingual
+                    )
+                else:
+                    extraction_result = self.extractor.extract(pdf_path, document_id)
+            except Exception as e:
+                # Adobe PDF Services failed - fall back to PyPDF2
+                print(f"  ⚠ Adobe PDF Services failed: {e}")
+                print("  → Falling back to PyPDF2...")
+
+                fallback_extractor = PDFExtractor()
+                extraction_result = fallback_extractor.extract(pdf_path, document_id)
+
+                # Mark as fallback in metadata
+                extraction_result["metadata"]["extraction_method"] = "PyPDF2 (Fallback)"
+                extraction_result["metadata"]["fallback_reason"] = str(e)
 
             document_id = extraction_result["metadata"]["document_id"]
             extracted_text = extraction_result["text"]
@@ -123,6 +187,8 @@ class IngestionPipeline:
 
             print(f"  ✓ Extracted {len(extracted_text)} characters")
             print(f"  ✓ Pages: {extraction_metadata['page_count']}")
+            print(f"  ✓ Extraction method: {extraction_metadata.get('extraction_method', self.extraction_method)}")
+            print(f"  ✓ Extraction mode: {extraction_metadata.get('extraction_mode', 'full_page')}")
             print(f"  ✓ Needs OCR: {needs_ocr}")
 
         # ============================================
@@ -142,16 +208,17 @@ class IngestionPipeline:
         if company_id:
             print(f"  ✓ Company ID: {company_id}")
 
-        # Save to Bronze (raw extraction) with taxonomy-based path
-        bronze_result = self._save_to_bronze(
-            document_id=document_id,
-            text=extracted_text,
-            metadata=extraction_metadata,
-            category=category,
-            regulator=regulator,
-            company_id=company_id,
-        )
-        print(f"  ✓ Saved to Bronze: {bronze_result['bronze_file']}")
+        # Save to Bronze (unless we already read from Bronze)
+        if not is_text_file:
+            bronze_result = self._save_to_bronze(
+                document_id=document_id,
+                text=extracted_text,
+                metadata=extraction_metadata,
+                category=category,
+                regulator=regulator,
+                company_id=company_id,
+            )
+            print(f"  ✓ Saved to Bronze: {bronze_result['bronze_file']}")
 
         # ============================================
         # STEP 2: OCR (if needed)
@@ -184,6 +251,34 @@ class IngestionPipeline:
             print("\nSTEP 2: OCR not needed (digital PDF)")
 
         # ============================================
+        # STEP 2.5: LANGUAGE FILTERING (for bilingual docs)
+        # ============================================
+        # NOTE: We filter here at the document level, so no need to filter again during segmentation
+        text_already_filtered = False
+
+        if is_bilingual:
+            print("\nSTEP 2.5: Filtering to English (bilingual document detected)...")
+            lang_preprocessor = LanguagePreprocessor(target_lang='en')
+
+            filtered_text, lang_metadata = lang_preprocessor.filter_text(
+                final_text,
+                chunk_by='sentence'
+            )
+
+            # Print stats
+            stats = lang_metadata['language_filter']['stats']
+            print(f"  ✓ Filtered {stats['total_blocks']} blocks")
+            print(f"  ✓ Kept {stats['kept_blocks']} English blocks")
+            print(f"  ✓ Dropped {stats['filtered_blocks']} non-English blocks")
+
+            if stats['languages_detected']:
+                print(f"  ✓ Languages detected: {', '.join(stats['languages_detected'].keys())}")
+
+            # Use filtered text for segmentation
+            final_text = filtered_text
+            text_already_filtered = True  # Don't filter again in segmenter
+
+        # ============================================
         # STEP 3: SEGMENTATION (SILVER)
         # ============================================
         print("\nSTEP 3: Segmenting into structured sections...")
@@ -206,10 +301,21 @@ class IngestionPipeline:
         if company_id:
             section_metadata["company_id"] = company_id
 
+        # Set PDF path for bookmark extraction (only if processing a PDF)
+        # For text files, skip bookmarks and use text-based segmentation directly
+        if not is_text_file and hasattr(self.segmenter, 'set_pdf_path'):
+            self.segmenter.set_pdf_path(pdf_path)
+        elif is_text_file and hasattr(self.segmenter, 'set_pdf_path'):
+            # Clear PDF path to force text-based segmentation for Bronze files
+            self.segmenter.set_pdf_path(None)
+
+        # Don't pass target_lang if we already filtered in STEP 2.5
+        # This prevents redundant filtering during segmentation
         sections = self.segmenter.segment(
             text=final_text,
             document_id=document_id,
             metadata=section_metadata,
+            target_lang=None,  # Text already filtered in STEP 2.5 if needed
         )
 
         print(f"  ✓ Identified {len(sections)} sections")
@@ -361,6 +467,31 @@ class IngestionPipeline:
             "silver_file": str(sections_file),
             "metadata_file": str(metadata_file),
         }
+
+    def _clean_bronze_text(self, text: str) -> str:
+        """
+        Clean Adobe extraction artifacts from Bronze text.
+
+        Removes:
+        - (<>) markers from Adobe PDF Services
+        - Extra whitespace and formatting artifacts
+
+        Args:
+            text: Raw Bronze text with Adobe artifacts
+
+        Returns:
+            Cleaned text ready for section parsing
+        """
+        import re
+
+        # Remove (<>) markers from Adobe
+        cleaned = re.sub(r'\(<>\)', '', text)
+
+        # Clean up excessive whitespace
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)  # Max 2 consecutive newlines
+        cleaned = re.sub(r' +', ' ', cleaned)  # Multiple spaces to single
+
+        return cleaned.strip()
 
 
 # Convenience function

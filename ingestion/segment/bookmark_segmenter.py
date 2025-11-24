@@ -11,7 +11,7 @@ import fitz  # PyMuPDF
 from pathlib import Path
 from typing import List, Dict, Optional
 import logging
-from ingestion.segment.advanced_segmenter import Section, SectionType
+from ingestion.segment.advanced_segmenter import Section, SectionType, is_toc_section
 
 try:
     from langdetect import detect, LangDetectException
@@ -185,7 +185,7 @@ class BookmarkSegmenter:
                 # Infer section type
                 section_type = self._infer_section_type(title, level)
 
-                # Create section
+                # Create section with TOC detection
                 section = {
                     "section_id": f"{document_id}_s{len(sections) + 1:04d}",
                     "section_number": section_number,
@@ -198,6 +198,7 @@ class BookmarkSegmenter:
                         "page_start": page_num,
                         "page_end": next_page - 1,
                         "bookmark_index": i,
+                        "is_toc": is_toc_section(clean_title, section_text.strip()),
                     }
                 }
 

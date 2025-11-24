@@ -197,20 +197,76 @@ class AdobePDFExtractor:
             with open(json_file, 'r', encoding='utf-8') as f:
                 structured_data = json.load(f)
 
+            # Determine page width for column filtering (if needed)
+            page_width = None
+            if extract_left_column_only and structured_data.get("pages"):
+                # Get width from first page
+                first_page = structured_data["pages"][0]
+                # Try both "width" (lowercase) and "Width" (uppercase) for compatibility
+                if "width" in first_page:
+                    page_width = first_page["width"]
+                    logging.info(f"  Bilingual mode: Page width = {page_width}, filtering left column only")
+                elif "Width" in first_page:
+                    page_width = first_page["Width"]
+                    logging.info(f"  Bilingual mode: Page width = {page_width}, filtering left column only")
+                else:
+                    logging.warning(f"  ⚠ Bilingual mode requested but no width found in page data. Available keys: {list(first_page.keys())}")
+
+            if extract_left_column_only and not page_width:
+                logging.warning("  ⚠ Bilingual filtering requested but page width could not be determined. Extracting all text.")
+
             # Extract plain text from elements
             text_blocks = []
             tables = []
+            filtered_count = 0
+            total_text_elements = 0
 
             for element in structured_data.get("elements", []):
                 # Extract text elements
                 if element.get("Text"):
-                    text_blocks.append(element["Text"])
+                    total_text_elements += 1
+                    # Check if we need to filter by column
+                    if extract_left_column_only and page_width:
+                        # Get element bounds (x0, y0, x1, y1)
+                        bounds = element.get("Bounds")
+                        if bounds and len(bounds) >= 4:
+                            x0 = bounds[0]
+                            midpoint = page_width / 2
+                            # Only include if element starts in left half
+                            if x0 < midpoint:
+                                text_blocks.append(element["Text"])
+                            else:
+                                filtered_count += 1
+                                # Debug: log first few filtered elements
+                                if filtered_count <= 3:
+                                    logging.debug(f"  Filtered (x={x0:.1f} >= {midpoint:.1f}): {element['Text'][:50]}...")
+                        else:
+                            # No bounds info, include it (fallback)
+                            text_blocks.append(element["Text"])
+                            if filtered_count == 0:  # Log once
+                                logging.warning(f"  ⚠ Element has no Bounds data. Available keys: {list(element.keys())}")
+                    else:
+                        # Not filtering, include all text
+                        text_blocks.append(element["Text"])
 
-                # Extract tables
-                if element.get("Path") and "table" in element["Path"].lower():
-                    tables.append(element)
+                # Extract tables (only from left column if filtering)
+                elif element.get("Path") and "table" in element["Path"].lower():
+                    if extract_left_column_only and page_width:
+                        bounds = element.get("Bounds")
+                        if bounds and len(bounds) >= 4:
+                            x0 = bounds[0]
+                            if x0 < page_width / 2:
+                                tables.append(element)
+                    else:
+                        tables.append(element)
+
+            if extract_left_column_only and page_width:
+                logging.info(f"  Bilingual filtering: kept {len(text_blocks)}/{total_text_elements} elements, filtered {filtered_count}")
 
             full_text = "\n\n".join(text_blocks)
+
+            # Add filtering info to metadata
+            extraction_mode = "bilingual_left_column" if extract_left_column_only else "full_page"
 
             # Get metadata
             metadata = {
@@ -219,6 +275,7 @@ class AdobePDFExtractor:
                 "element_count": len(structured_data.get("elements", [])),
                 "table_count": len(tables),
                 "extraction_method": "Adobe PDF Services",
+                "extraction_mode": extraction_mode,
                 "version": structured_data.get("version", "unknown"),
             }
 

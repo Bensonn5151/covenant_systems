@@ -183,7 +183,7 @@ class MetadataParser:
 
         Args:
             title: Document title
-            citation: Citation (e.g., "SOR/86-304")
+            citation: Citation (e.g., "SOR/86-304") or None if not available
 
         Returns:
             Sanitized filename
@@ -191,11 +191,16 @@ class MetadataParser:
         # Remove citation from title if present
         clean_title = re.sub(r"\([^)]+\)$", "", title).strip()
 
-        # Normalize citation (replace / with -)
-        clean_citation = citation.replace("/", "-")
-
-        # Combine
-        filename = f"{clean_citation} - {clean_title}.pdf"
+        # Handle missing citation
+        if citation is None or citation == "":
+            # Use title only with timestamp fallback
+            timestamp = datetime.now().strftime("%Y%m%d")
+            filename = f"{clean_title} - {timestamp}.pdf"
+        else:
+            # Normalize citation (replace / with -)
+            clean_citation = citation.replace("/", "-")
+            # Combine
+            filename = f"{clean_citation} - {clean_title}.pdf"
 
         # Remove invalid filename characters
         filename = re.sub(r'[<>:"/\\|?*]', "", filename)

@@ -8,6 +8,14 @@ Uses sentence-transformers/all-MiniLM-L6-v2 by default (384 dimensions).
 Fast, efficient, and good quality for regulatory text.
 """
 
+# Set threading environment variables before imports
+import os
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+
 import numpy as np
 from typing import List, Dict, Optional, Union
 from pathlib import Path
@@ -16,6 +24,9 @@ import json
 try:
     from sentence_transformers import SentenceTransformer
     import torch
+    # Disable PyTorch multiprocessing
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
 except ImportError as e:
     raise ImportError(
         "Embedding dependencies not installed. "
