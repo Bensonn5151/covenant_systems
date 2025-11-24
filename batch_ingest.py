@@ -124,6 +124,14 @@ class BatchIngester:
                     file_found = True
                     file_path = file_path_plural
 
+                # For guidance documents, check regulator subdirectory
+                if not file_found and category == "guidance" and "regulator" in doc:
+                    regulator = doc["regulator"].lower()
+                    file_path_regulator = self.manifest_dir / category / regulator / filename
+                    if file_path_regulator.exists():
+                        file_found = True
+                        file_path = file_path_regulator
+
         # Fallback to manifest directory root
         if not file_found:
             file_path_root = self.manifest_dir / filename
@@ -152,13 +160,29 @@ class BatchIngester:
         parent_act = doc.get("parent_act")
         company_id = doc.get("company_id")
 
+        # Generate document_id from filename (consistent with how Bronze folders are created)
+        document_id = Path(filename).stem.lower().replace(" ", "_").replace(",_", "_").replace("_-_", "_")
+
+        # Check if Bronze already exists
+        bronze_file = self._find_bronze_file(filename, category, regulator, company_id)
+
+        if bronze_file:
+            print(f"📦 Found existing Bronze: {bronze_file}")
+            print("   → Using Bronze→Silver flow (skipping PDF extraction)")
+            input_path = bronze_file
+        else:
+            print(f"📄 No Bronze found, processing PDF: {file_path}")
+            print("   → Using PDF→Bronze→Silver flow")
+            input_path = str(file_path)
+
         try:
-            # Process through pipeline
+            # Process through pipeline (handles both PDF and Bronze .txt)
             result = self.pipeline.process_document(
-                pdf_path=str(file_path),
+                pdf_path=input_path,  # Can be PDF or Bronze .txt
+                document_id=document_id,  # CRITICAL: Pass document_id explicitly
                 document_type=document_type,
                 jurisdiction=jurisdiction,
-                is_bilingual=is_bilingual,
+                is_bilingual=is_bilingual if not bronze_file else False,  # Bronze already filtered
                 manual_category=category,
                 regulator=regulator,
                 parent_act=parent_act,
@@ -190,6 +214,71 @@ class BatchIngester:
             })
 
             return False
+
+    def _find_bronze_file(self, filename: str, category: str, regulator: str = None, company_id: str = None) -> str:
+        """
+        Check if Bronze file already exists for this document.
+
+        Args:
+            filename: Original PDF filename
+            category: Document category (act, regulation, guidance, policy)
+            regulator: Regulator code (for guidance)
+            company_id: Company ID (for policies)
+
+        Returns:
+            Path to Bronze raw_text.txt if found, None otherwise
+        """
+        bronze_base = Path("storage/bronze")
+
+        # Construct expected document ID from filename
+        # Remove extension, lowercase, replace spaces with underscores
+        doc_id = Path(filename).stem.lower().replace(" ", "_")
+
+        # Also try with commas normalized
+        doc_id_normalized = doc_id.replace(",_", "_").replace("_-_", "_")
+
+        # Map category to plural form for storage
+        category_plural = {
+            "act": "acts",
+            "regulation": "regulations",
+            "guidance": "guidance",
+            "policy": "company_policies"
+        }.get(category, category)
+
+        # Build multiple possible paths to check
+        possible_paths = []
+
+        if category == "guidance" and regulator:
+            # guidance/{regulator}/{doc_id}/raw_text.txt
+            possible_paths.append(bronze_base / category_plural / regulator.lower() / doc_id / "raw_text.txt")
+            possible_paths.append(bronze_base / category_plural / regulator.lower() / doc_id_normalized / "raw_text.txt")
+        elif category == "policy" and company_id:
+            # company_policies/{company_id}/{doc_id}/raw_text.txt
+            possible_paths.append(bronze_base / category_plural / company_id.lower() / doc_id / "raw_text.txt")
+            possible_paths.append(bronze_base / category_plural / company_id.lower() / doc_id_normalized / "raw_text.txt")
+        else:
+            # acts/{doc_id}/raw_text.txt or regulations/{doc_id}/raw_text.txt
+            possible_paths.append(bronze_base / category_plural / doc_id / "raw_text.txt")
+            possible_paths.append(bronze_base / category_plural / doc_id_normalized / "raw_text.txt")
+
+        # Check all possible paths
+        for bronze_path in possible_paths:
+            if bronze_path.exists():
+                return str(bronze_path)
+
+        # Fallback: fuzzy search all Bronze files
+        # Look for files where the document name is similar
+        doc_id_parts = set(doc_id.split("_"))
+
+        for bronze_file in bronze_base.rglob("raw_text.txt"):
+            parent_name = bronze_file.parent.name.lower()
+            parent_parts = set(parent_name.split("_"))
+
+            # If most of the significant words match, consider it a match
+            if len(doc_id_parts & parent_parts) >= min(3, len(doc_id_parts) * 0.6):
+                return str(bronze_file)
+
+        return None
 
     def _infer_document_type(self, category: str, title: str) -> str:
         """Infer document type from category and title."""
