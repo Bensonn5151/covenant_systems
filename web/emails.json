@@ -1,0 +1,14 @@
+[
+  {
+    "id": 2,
+    "email": "32@gmail.com",
+    "submitted_at": "2025-11-20T15:10:59.691Z",
+    "status": "New"
+  },
+  {
+    "id": 1,
+    "email": "ben@gmail.com",
+    "submitted_at": "2025-11-20T15:10:21.402Z",
+    "status": "New"
+  }
+]
