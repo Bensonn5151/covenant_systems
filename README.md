@@ -1,389 +1,376 @@
-# Covenant Compliance Engine — AI-Ready Regulatory Intelligence Platform
-The Covenant Compliance Engine is an end-to-end AI system for parsing, structuring, retrieving, and evaluating legal + regulatory documents against internal or customer policies. It provides:
+# Covenant Systems — Regulatory Intelligence Platform
 
-	•	A full ingestion + parsing stack (PDF → sections → structured nodes → embeddings)
-	•	Multi-stage hybrid retrieval (BM25 + semantic + rerankers)
-	•	Explainable agentic reasoning
-	•	A regulatory Knowledge Graph (YAML-based)
-	•	Scored compliance evaluations with confidence
-	•	API endpoints for integrations
-	•	Benchmarks, validation suites, and dashboards
+**Version:** 0.2.0 (Bronze → Silver → Gold → Search)  
+**Last Updated:** 2025-11-24
 
-The system follows a strict Bronze → Silver → Gold data architecture and is designed for enterprise-grade transparency, auditability, and regulator-friendly explanations.
+---
 
+## Overview
 
-## 1. System Overview
+Covenant Systems is a **GraphRAG-powered regulatory intelligence engine** that automates compliance workflows for financial institutions. The platform ingests regulatory documents (Acts, Regulations, Guidance) and transforms them into a searchable knowledge base with semantic understanding and relationship mapping.
 
-The system converts raw laws and policies into a machine-processable legal substrate, enabling:
+**Current Status**: Operational Bronze → Silver → Gold pipeline with semantic search capabilities.
 
-	•	Compliance checking
-	•	Policy gap analysis
-	•	Explainable reasoning traces
-	•	Audit-ready reports
-	•	Retrieval-augmented regulatory search
-	•	Automatic metadata + domain tagging
-	•	Knowledge graph-driven context expansion
+---
 
-Core value proposition:
+## Quick Start
 
-Turn unstructured regulation into structured insights, searchable sections, and trustworthy AI-generated evaluations.
+```bash
+# 1. Activate environment
+source venv/bin/activate
 
-## 2. Architecture
+# 2. Process documents (Bronze → Silver)
+python3 batch_ingest.py data/raw/manifest.yaml --continue-on-error
+python3 batch_ingest.py data/raw/fintrac_guidance_manifest.yaml --continue-on-error
 
-The platform has six major layers:
+# 3. Generate embeddings (Silver → Gold)
+python3 generate_embeddings.py
 
-- data      →    ingestion    →    storage      →    ai  
-(raw laws)         (parsing)            (bronze/silver/gold)   (retrieval + agent reasoning)
+# 4. Launch dashboard
+./run_dashboard.sh
+```
 
-  →    api       →    dashboard
-       (backend)          (UI + analytics)
+**Result**: Browse at http://localhost:8501
+- 📤 Upload: Process new PDFs
+- 🔷 Silver Layer: Browse structured sections
+- 🔍 Search: Semantic search across all documents
 
-## 2.1 High-Level Architectural Diagram
+---
 
-"""
-          ┌──────────────────────────┐
-          │  Raw Regulations (PDF)   │
-          └──────────────┬───────────┘
-                         ▼
-         ┌──────────────────────────────┐
-         │ ingestion (OCR + Parsing) │
-         │ - PDF extraction             │
-         │ - Section segmentation       │
-         │ - Cleaning + normalization   │
-         └──────────────┬───────────────┘
-                        ▼
-    ┌────────────────────────────────────────┐
-    │ storage (Bronze → Silver → Gold)    │
-    │ - Bronze: raw text                     │
-    │ - Silver: structured sections          │
-    │ - Gold: embeddings + metadata          │
-    └──────────────────┬─────────────────────┘
-                       ▼
-     ┌───────────────────────────────────────┐
-     │ ai (Retrieval + Reasoning Engine)  │
-     │ - Hybrid retriever (BM25+Semantic)    │
-     │ - Reranker                            │
-     │ - Knowledge Graph expansion           │
-     │ - Agentic multi-step evaluation       │
-     │ - Evidence trace + explainability     │
-     └───────────────────┬───────────────────┘
-                         ▼
-        ┌─────────────────────────────────┐
-        │ api (FastAPI backend)        │
-        │ - Evaluate policies             │
-        │ - Retrieve relevant regulations │
-        │ - Generate audit reports        │
-        └─────────────────────┬───────────┘
-                              ▼
-             ┌──────────────────────────┐
-             │ dashboard (UI)        │
-             │ - Reasoning trace viewer │
-             │ - Gap analysis           │
-             │ - Similar-case browser   │
-             └──────────────────────────┘
-"""
+## System Architecture
 
-## 3. Folder Structure
-'''
+```
+Data Sources (laws.justice.gc.ca, FINTRAC)
+    ↓
+┌─────────────────────────────────────────────┐
+│ DATA GATHERING                              │
+│ • Mapper downloads acts/regulations         │
+│ • Scraper fetches FINTRAC HTML guidance    │
+│ • HTML → PDF conversion                     │
+│ Output: data/raw/{acts,regulations,guidance}│
+└─────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────┐
+│ MANIFEST (Metadata Registry)                │
+│ • Auto-generated from downloads             │
+│ • YAML format (document metadata)           │
+│ Output: data/raw/manifest.yaml              │
+└─────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────┐
+│ BRONZE LAYER (Raw Text)                     │
+│ • Adobe PDF Services (95%+ accuracy)        │
+│ • Language filtering (English only)         │
+│ • OCR fallback for scanned docs             │
+│ Output: storage/bronze/{category}/{doc_id}/ │
+└─────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────┐
+│ SILVER LAYER (Structured Sections)          │
+│ • Hybrid segmentation (bookmarks + regex)   │
+│ • Hierarchical numbering (1, 1.1, 1.2.3)   │
+│ • TOC filtering (is_toc metadata)           │
+│ • Metadata inference (jurisdiction, type)   │
+│ Output: storage/silver/{category}/{doc_id}/ │
+└─────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────┐
+│ GOLD LAYER (Embeddings)                     │
+│ • sentence-transformers (384 dimensions)    │
+│ • FAISS vector index (cosine similarity)    │
+│ • TOC sections excluded from embeddings     │
+│ Output: storage/gold/{doc_id}/              │
+│         storage/vector_db/covenant.index    │
+└─────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────┐
+│ SEARCH (Semantic Similarity)                │
+│ • Natural language queries                  │
+│ • Top-K retrieval with scores               │
+│ • Category filtering (act, reg, guidance)   │
+│ • Export (JSON, CSV)                        │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## Current Capabilities
+
+### ✅ Operational Features
+
+1. **Automated Data Acquisition**
+   - Legislative Mapper: Downloads Acts/Regulations from laws.justice.gc.ca
+   - FINTRAC Scraper: Fetches guidance documents as HTML
+   - HTML-to-PDF conversion for guidance documents
+
+2. **Multi-Layer Data Pipeline**
+   - **Bronze**: Raw text extraction (Adobe PDF Services + PyPDF2 fallback)
+   - **Silver**: Structured sections with hierarchical numbering
+   - **Gold**: 384-dimensional embeddings with FAISS indexing
+
+3. **Semantic Search**
+   - CLI: `python3 search/semantic_search.py "query"`
+   - Dashboard: Interactive search UI with filtering
+   - 22,402 sections indexed across 23 documents
+
+4. **Document Coverage** (PCMLTFA-Focused)
+   - 6 Acts (PCMLTFA, PIPEDA, Bank Act, CDIC Act, SEMA, Magnitsky Law)
+   - 9 Regulations (PCMLTFA regs, sanctions, privacy)
+   - 8 FINTRAC Guidance documents
+
+### 🚧 In Development (Milestone 1)
+
+- Knowledge Graph construction (nodes, edges, relationships)
+- Graph-augmented retrieval (semantic + graph traversal)
+- Impact analysis engine (regulatory change detection)
+- Explainable reasoning interface
+
+---
+
+## Data Architecture
+
+### Bronze Layer (Raw Text)
+- **Purpose**: Ground truth archive for audits
+- **Content**: Raw text extracted from PDFs, no transformations
+- **Storage**: `storage/bronze/{category}/{doc_id}/raw_text.txt`
+- **Features**: OCR support, language filtering (English only)
+
+### Silver Layer (Structured Sections)
+- **Purpose**: Parsed, hierarchical regulatory content
+- **Content**: Sections with metadata (title, number, hierarchy)
+- **Storage**: `storage/silver/{category}/{doc_id}/sections.json`
+- **Features**:
+  - Hybrid segmentation (PDF bookmarks + regex patterns)
+  - TOC detection and tagging (`is_toc: true`)
+  - Metadata inference (jurisdiction, regulator, topics)
+
+### Gold Layer (Embeddings)
+- **Purpose**: Semantic search-ready vectors
+- **Content**: 384-dim embeddings (sentence-transformers/all-MiniLM-L6-v2)
+- **Storage**: 
+  - `storage/gold/{doc_id}/embeddings.npy`
+  - `storage/vector_db/covenant.index` (FAISS)
+- **Features**:
+  - TOC sections excluded from embeddings
+  - Cosine similarity search
+  - Batch processing (500 sections/min on CPU)
+
+---
+
+## Folder Structure
+
+```
 /
 ├── README.md
+├── usage.md                    # Detailed operational guide
+├── EXECUTIVE_SUMMARY.md        # Business/funding overview
+├── mapper_config.yaml          # Acts/regulations to download
 
 ├── data/
-│   ├── regulations/
-│   │   ├── raw/
-│   │   ├── processed/
-│   │   └── metadata/
-│   ├── policies/
-│   │   ├── raw/
-│   │   └── processed/
-│   └── validation/
-│       ├── expert/
-│       ├── synthetic/
-│       └── benchmarks/
+│   └── raw/
+│       ├── acts/               # Downloaded acts (PDFs)
+│       ├── regulations/        # Downloaded regulations (PDFs)
+│       ├── guidance/           # FINTRAC guidance (PDFs)
+│       ├── manifest.yaml       # Master document registry
+│       └── fintrac_guidance_manifest.yaml
 
 ├── ingestion/
-│   ├── extract/
-│   ├── ocr/
-│   ├── transform/
-│   ├── segment/
-│   ├── embed/
+│   ├── extract/                # PDF extraction (Adobe, PyPDF2)
+│   ├── segment/                # Section segmentation
+│   │   ├── advanced_segmenter.py
+│   │   └── bookmark_segmenter.py
 │   └── utils/
 
 ├── storage/
-│   ├── bronze/
-│   ├── silver/
-│   ├── gold/
-│   ├── postgres/
-│   ├── vector_db/
-│   └── hybrid/
-│
-│   └── knowledge_graph/
-│       ├── nodes.yaml
-│       ├── edges.yaml
-│       ├── domains.yaml
-│       └── embeddings/
+│   ├── bronze/                 # Raw text layer
+│   ├── silver/                 # Structured sections layer
+│   ├── gold/                   # Embeddings layer
+│   └── vector_db/              # FAISS index
+│       ├── covenant.index
+│       ├── id_to_section.json
+│       └── faiss_manager.py
 
-├── ai/
-│   ├── retrieval/
-│   ├── reasoning/
-│   ├── agents/
-│   ├── evaluation/
-│   ├── models/
-│   └── comparison/
+├── search/
+│   └── semantic_search.py      # CLI search tool
 
-├── api/
-│   ├── fastapi/
-│   │   ├── routes/
-│   │   └── schemas/
-│   └── tests/
+├── dashboard/                  # Streamlit UI
+│   ├── app.py
+│   └── pages/
 
-└── dashboard/
-    ├── dashboards/
-    ├── components/
-    └── audit/
+└── web/                        # Next.js frontend (future)
+```
 
-└── configs/
-    ├── settings.yaml
-    ├── retrieval_modes.yaml
-    ├── thresholds.yaml
-    └── .env.example
-'''
+---
 
-## 4. Data Architecture (Bronze / Silver / Gold)
-
-Bronze (Raw Layer)
-
-	•	Raw text extracted from PDFs
-	•	No transformations
-	•	Includes OCR’d text where required
-	•	Stored exactly as received
-	•	Ground truth archive for audits
-
-Silver (Structured Legal Layer)
-
-	•	Parsed sections, clauses, definitions
-	•	Hierarchical structure (Part → Division → Section)
-	•	Cleaned formatting, normalized whitespace
-	•	Linked to metadata:
-	•	jurisdiction
-	•	effective dates
-	•	regulatory domain taxonomy
-
-Gold (Semantic Intelligence Layer)
-
-	•	Embeddings (OpenAI, Azure, or Llama)
-	•	Tokenized chunks ready for retrieval
-	•	Knowledge Graph relations applied
-	•	Domain + risk scoring precomputed
-	•	Dense + sparse indexes (FAISS + BM25)
-
-⸻
-
-## 5. Knowledge Graph (YAML-based)
-
-Knowledge Graph is stored in YAML for readability, flexibility, and LLM interpretability.
+## Knowledge Graph (Planned - Milestone 1)
 
 ### Purpose
-
-The Knowledge Graph enables:
+The Knowledge Graph will enable:
 - **Cross-document navigation**: Bank Act → OSFI Guidelines → Internal Policies
-- **Relationship detection**: cites, requires, implements, conflicts_with
-- **Context expansion**: During retrieval, follow edges to find related sections
-- **Gap analysis**: Find missing policy coverage
-- **Impact analysis**: What changes if regulation X is amended?
+- **Relationship detection**: `cites`, `requires`, `implements`, `conflicts_with`
+- **Context expansion**: Follow edges to find related sections during retrieval
+- **Impact analysis**: Trace how regulatory changes cascade through compliance frameworks
 
 ### Node Types
-
-The graph supports multiple node types:
 - **regulation**: Sections from acts/regulations
 - **clause**: Specific clauses/subsections
 - **obligation**: Extracted requirements
 - **prohibition**: Extracted restrictions
-- **permission**: Extracted allowances
 - **definition**: Legal term definitions
-- **control**: Internal controls/procedures
-- **policy**: Company policies
 
-### nodes.yaml
-
-Contains every regulatory and policy node.
-```yaml
-- id: BA-6-1
-  type: regulation
-  source_document: "Bank Act (Canada)"
-  section: "6(1)"
-  text: "A bank shall not carry on business as a bank, except in accordance with this Act."
-  domains: ["banking", "licensing"]
-  metadata:
-    jurisdiction: "Canada"
-    regulator: "OSFI"
-    risk_level: high
-    enforceable: true
-    effective_date: "2024-01-01"
-```
-
-### edges.yaml
-
-Represents cross-references and semantic/legal relationships.
-
-```yaml
-- from: BA-6-1
-  to: PCMLTFA-9
-  type: requires_alignment
-  description: "Bank licensing triggers AML compliance requirements under PCMLTFA"
-  confidence: 0.87
-  source: "legal_analysis"
-  date_created: "2024-11-16"
-```
-
-**Relationship Types:**
+### Relationship Types
 - `cites`: Section A references Section B
 - `requires`: Section A mandates compliance with Section B
 - `implements`: Policy implements regulation
 - `conflicts_with`: Potential conflict detected
-- `supersedes`: New regulation replaces old one
 - `amends`: Regulation modifies another
 
-### domains.yaml
+### Storage Format
+- `nodes.yaml`: Regulatory sections as graph nodes
+- `edges.yaml`: Relationships between sections
+- `domains.yaml`: Compliance domain taxonomy
 
-Domain taxonomy used for compliance area classification.
+---
+
+## Search Capabilities
+
+### Semantic Search (Operational)
+
+**CLI Usage**:
+```bash
+python3 search/semantic_search.py "customer due diligence requirements"
+```
+
+**Dashboard Usage**:
+```bash
+./run_dashboard.sh
+# Navigate to 🔍 Search page
+```
+
+**Features**:
+- Natural language queries
+- Relevance scoring (0-1 similarity)
+- Category filtering (act, regulation, guidance)
+- Top-K results (configurable)
+- Export to JSON/CSV
+
+**Example Queries**:
+- "beneficial ownership identification requirements"
+- "suspicious transaction reporting thresholds"
+- "PEP screening obligations for banks"
+- "record keeping requirements for MSBs"
+
+### Hybrid Retrieval (Planned - Milestone 1)
+
+Future enhancement combining:
+1. Semantic search (current FAISS)
+2. Graph traversal (follow KG edges)
+3. Rank aggregation (merge results)
+4. Reranking (cross-encoder precision boost)
+
+---
+
+## Configuration
+
+### Mapper Configuration (`mapper_config.yaml`)
+
+Defines which Acts and Regulations to download:
 
 ```yaml
-domains:
-  - name: "Anti-Money Laundering (AML)"
-    abbreviation: "AML"
-    regulators: ["FINTRAC", "FinCEN"]
-    applicable_jurisdictions: ["Canada", "United States"]
-    related_acts: ["PCMLTFA", "Bank Secrecy Act"]
+# Acts to download (auto-discovers related regulations)
+act_slugs:
+  - "P-24.501"  # PCMLTFA
+  - "P-8.6"     # PIPEDA
+  - "B-1.01"    # Bank Act
 
-  - name: "Privacy & Data Protection"
-    abbreviation: "Privacy"
-    regulators: ["OPC", "ICO", "CNIL"]
-    applicable_jurisdictions: ["Canada", "UK", "EU"]
-    related_acts: ["PIPEDA", "GDPR", "UK DPA"]
+# Specific regulations
+regulation_slugs:
+  - "SOR-2002-184"  # PCMLTFA Regulations
+  - "SOR-2001-317"  # Suspicious Transaction Reporting
+  - "SOR-2019-240"  # Virtual Currency Regulations
+
+# Guidance priorities (for scraping)
+guidance:
+  fintrac:
+    - "Guidance on the Risk-Based Approach"
+    - "Methods to verify the identity of persons and entities"
+    - "Beneficial ownership requirements"
 ```
 
-### KG Construction Pipeline
+---
 
-```
-Silver Sections → Entity Extraction → Relationship Detection → KG Nodes/Edges
-                   (LLM/NER)           (Rule-based + LLM)
-```
+## Development Roadmap
 
-1. Extract entities (sections, references, dates)
-2. Detect relationships (regex patterns + LLM analysis)
-3. Generate KG entries (YAML format)
-4. Validate schema (ensure no broken edges)
-5. Embed KG nodes for semantic search
+### ✅ Phase 1: Data Pipeline (Complete)
+- Automated data acquisition (Legislative Mapper + FINTRAC Scraper)
+- Bronze → Silver → Gold ingestion pipeline
+- Semantic search with FAISS
+- Dashboard UI (Streamlit)
 
-### KG-Enhanced Retrieval
+### 🚧 Phase 2: GraphRAG MVP (In Progress - Milestone 1)
+- Knowledge Graph construction
+- Graph-augmented retrieval
+- Impact analysis engine
+- Explainable reasoning interface
 
-```
-User Query → Vector Search → Retrieve Top-K sections
-                ↓
-           KG Expansion (follow edges: cites, requires)
-                ↓
-           Add neighbor nodes for context
-                ↓
-           Return enriched results with relationships
-```
+### 📋 Phase 3: Enterprise Features (Planned)
+- Multi-jurisdiction support (UK, US, EU)
+- Policy gap analysis
+- Compliance scoring engine
+- Audit report generation
+- FastAPI backend
+- SOC 2 Type II certification
 
-## 6. Retrieval Architecture
+---
 
-Multi-stage hybrid retriever
+## Performance Metrics
 
-1. Sparse retrieval (BM25)
-→ High recall on exact matches
+**Current System**:
+- Documents: 23 (6 Acts + 9 Regulations + 8 Guidance)
+- Sections: 22,402 (after TOC filtering)
+- Embedding dimension: 384
+- Search latency: <1 second for top-10 results
+- Ingestion speed: ~3 min/doc (first run), ~15 sec/doc (Bronze cached)
 
-2. Dense semantic retrieval
-→ Captures meaning & paraphrase
+---
 
-3. Hybrid fusion
-→ Merges both vectors via rank aggregation
+## Documentation
 
-4. Reranker (Cross Encoder)
-→ Final precision improvement
+- **[usage.md](usage.md)**: Complete operational guide (data gathering, ingestion, search)
+- **[EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md)**: Business overview and funding milestones
+- **[docs/MANIFEST_GUIDE.md](docs/MANIFEST_GUIDE.md)**: Manifest structure and validation
 
-5. Graph-based Expansion
-→ Add neighboring KG nodes for context
+---
 
-## 7. Agentic Reasoning Architecture
+## Technology Stack
 
-The agent runs a multi-step reasoning workflow:
-	1.	Retrieve candidate sections
-	2.	Verify relevance using a verifier prompt
-	3.	Expand context using Knowledge Graph
-	4.	Evaluate policy statement
-	5.	Generate a reasoning trace
-	6.	Produce compliance scoring
-	7.	Provide regulator-friendly explanations
+**Data Processing**:
+- Adobe PDF Services API (text extraction)
+- PyPDF2 (fallback extraction)
+- Python 3.11+
 
-The final output includes:
-- Verdict (Compliant / Non-Compliant / Unknown)
-- Confidence score
-- Evidence-set (citations)
-- Reasoning trace
-- Suggested remediation
+**Embeddings & Search**:
+- sentence-transformers (all-MiniLM-L6-v2)
+- FAISS (vector indexing)
+- NumPy (embedding storage)
 
-## 8. API Layer
+**UI**:
+- Streamlit (dashboard)
+- Next.js (future web frontend)
 
-API is implemented using FastAPI:
+**Infrastructure**:
+- YAML (manifests, configuration)
+- JSON (structured data)
+- Git (version control)
 
-Key routes:
+---
 
-- POST /evaluate_policy
-- POST /retrieve_sections
-- GET  /similar_cases
-- GET  /explain/{evaluation_id}
-- GET  /audit/{evaluation_id}
-Payloads are schema-validated using Pydantic.
+## License
 
-## 9. Validation, Benchmarking, QA
+Proprietary - Covenant Systems
 
-Benchmark Suite
-	•	Precision / Recall / F1 on retrieval
-	•	Compliance scoring accuracy
-	•	Latency and performance metrics
+---
 
-Validation Sets
-	•	Expert-reviewed cases
-	•	Synthetic edge cases
-	•	Known-failure regression tests
+## Contact
 
-Quality Gates
-	•	Model output thresholds
-	•	Retrieval recall floors
-	•	Reranker precision minimums
-
-## 10. Deployment Blueprint
-
-Recommended stack:
-
-	•	Backend: FastAPI
-	•	Workers: Celery or Prefect
-	•	Vector DB: FAISS GPU
-	•	Search DB: Elasticsearch
-	•	Database: Postgres
-	•	Orchestration: Airflow
-  •	Container: Docker
-	•	Frontend: Next.js + Tailwind
-
-## 11. Roadmap
-
-### v1
-	•	Full ingestion pipeline
-	•	Hybrid retrieval
-	•	Compliance scoring engine
-	•	YAML knowledge graph
-	•	FastAPI backend
-
-### v2
-	•	Agentic workflows
-	•	Explainability UI
-	•	GAP analysis engine
-	•	Similar-case retrieval
-
-### v3
-	•	LLM fine-tuning
-	•	Continuous benchmark runner
-	•	Policy drafting assistant
+For investor materials, technical documentation, or partnership inquiries, contact the Covenant Systems team.
