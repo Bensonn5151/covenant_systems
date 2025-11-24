@@ -61,14 +61,22 @@ with st.sidebar:
 
     st.markdown("### 📊 System Status")
 
-    # Check if storage exists
-    bronze_path = Path("storage/bronze")
-    silver_path = Path("storage/silver")
-    gold_path = Path("storage/gold")
+    # Check if storage exists (project root, not dashboard directory)
+    project_root = Path(__file__).parent.parent
+    bronze_path = project_root / "storage" / "bronze"
+    silver_path = project_root / "storage" / "silver"
+    gold_path = project_root / "storage" / "gold"
+    vector_index = project_root / "storage" / "vector_db" / "covenant.index"
 
     st.metric("Documents (Bronze)", len(list(bronze_path.glob("*"))) if bronze_path.exists() else 0)
     st.metric("Documents (Silver)", len(list(silver_path.glob("*"))) if silver_path.exists() else 0)
     st.metric("Documents (Gold)", len(list(gold_path.glob("*"))) if gold_path.exists() else 0)
+
+    # Show search index status
+    if vector_index.exists():
+        st.success("🔍 Search Index: Ready")
+    else:
+        st.warning("⚠️ Search Index: Not Built")
 
     st.markdown("---")
     st.markdown("### 📖 Quick Links")
@@ -84,12 +92,12 @@ st.markdown("## 🚀 Welcome")
 st.markdown("""
 This dashboard provides an interactive interface for the Covenant Compliance Engine.
 
-**Current Status:** Phase 1 - Bronze → Silver Pipeline
+**Current Status:** Bronze → Silver → Gold Pipeline ✓
 
 Navigate using the sidebar to:
 - 📤 **Upload Documents**: Ingest new regulatory PDFs
-- 📦 **Bronze Layer**: View raw extracted text
 - 🔷 **Silver Layer**: Browse structured sections
+- 🔍 **Search**: Semantic search across all documents
 """)
 
 # System Overview
@@ -127,8 +135,8 @@ with col3:
         <h3>🌟 Gold Layer</h3>
         <p>Semantic intelligence</p>
         <ul>
-            <li>Embeddings (Coming Soon)</li>
-            <li>Semantic labels</li>
+            <li>✓ Vector embeddings</li>
+            <li>✓ Semantic search</li>
             <li>RAG-ready vectors</li>
         </ul>
     </div>
@@ -141,10 +149,10 @@ st.markdown("## ⚡ Quick Start")
 
 st.markdown("""
 1. **Upload a Document**: Go to "📤 Upload" in the sidebar
-2. **View Bronze**: Check the raw extracted text
-3. **Explore Silver**: Browse the structured sections
-4. **Test Retrieval**: (Coming in Phase 3)
-5. **Evaluate Compliance**: (Coming in Phase 4)
+2. **Process to Silver**: Transform raw text into structured sections
+3. **Generate Embeddings**: Run `python3 generate_embeddings.py` (one-time setup)
+4. **Search**: Use "🔍 Search" to find relevant sections semantically
+5. **Export Results**: Download search results as JSON or CSV
 """)
 
 # Footer
