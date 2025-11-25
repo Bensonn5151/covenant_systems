@@ -106,6 +106,14 @@ class ManifestValidator:
                         file_found = True
                         file_path = file_path_plural
 
+                    # For guidance documents, check regulator subdirectory
+                    if not file_found and category == "guidance" and "regulator" in doc:
+                        regulator = doc["regulator"].lower()
+                        file_path_regulator = self.manifest_dir / category / regulator / filename
+                        if file_path_regulator.exists():
+                            file_found = True
+                            file_path = file_path_regulator
+
             # Fallback to manifest directory root
             if not file_found:
                 file_path_root = self.manifest_dir / filename
@@ -182,6 +190,10 @@ class ManifestValidator:
         acts = {doc.get("title") for doc in documents if doc.get("category") == "act"}
         all_titles = {doc.get("title") for doc in documents if "title" in doc}
 
+        # Check if this is a guidance-only manifest
+        has_acts = len(acts) > 0
+        is_guidance_only = all(doc.get("category") == "guidance" for doc in documents)
+
         for i, doc in enumerate(documents):
             doc_num = i + 1
             filename = doc.get("filename", f"doc_{doc_num}")
@@ -190,6 +202,17 @@ class ManifestValidator:
             if "parent_act" in doc:
                 parent = doc["parent_act"]
 
+                # Skip parent_act validation for guidance-only manifests
+                if is_guidance_only:
+                    # Just validate that parent_act is a string
+                    if not isinstance(parent, str):
+                        self.errors.append(
+                            f"Document {doc_num} ({filename}): "
+                            f"parent_act must be a string"
+                        )
+                    continue
+
+                # For mixed manifests, validate that parent_act exists
                 # Try exact match first
                 if parent not in acts:
                     # Try normalized match (case-insensitive, ignore citations)
