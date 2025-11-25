@@ -40,9 +40,17 @@ def process_document(doc_path: Path, embedder: Embedder):
         return None
 
     with open(sections_file, "r", encoding="utf-8") as f:
-        sections = json.load(f)
+        all_sections = json.load(f)
 
-    print(f"Loaded {len(sections)} sections")
+    # Filter out TOC sections
+    sections = [s for s in all_sections if not s.get("metadata", {}).get("is_toc", False)]
+
+    # Log statistics
+    toc_count = len(all_sections) - len(sections)
+    if toc_count > 0:
+        print(f"  ⚠️  Filtered {toc_count} TOC sections ({toc_count/len(all_sections)*100:.2f}%)")
+
+    print(f"  → Embedding {len(sections)} sections")
 
     # Generate embeddings
     enriched_sections, embeddings = embedder.embed_sections(sections)
@@ -157,13 +165,42 @@ def main():
 
     # Get documents to process
     if args.document:
-        documents = [silver_path / args.document]
-        if not documents[0].exists():
+        # Try to find document in any category
+        documents = []
+        for category_dir in silver_path.iterdir():
+            if category_dir.is_dir() and not category_dir.name.startswith('.'):
+                doc_path = category_dir / args.document
+                if doc_path.exists() and (doc_path / "sections.json").exists():
+                    documents = [doc_path]
+                    break
+
+        if not documents:
             print(f"❌ Error: Document not found: {args.document}")
             sys.exit(1)
     else:
-        # Process all documents
-        documents = [d for d in silver_path.iterdir() if d.is_dir()]
+        # Process all documents across all categories (acts, regulations, guidance)
+        documents = []
+        for category_dir in silver_path.iterdir():
+            if category_dir.is_dir() and not category_dir.name.startswith('.'):
+                # Special handling for guidance: has regulator subfolder
+                if category_dir.name == "guidance":
+                    # Traverse: guidance/{regulator}/{doc_id}/sections.json
+                    for regulator_dir in category_dir.iterdir():
+                        if regulator_dir.is_dir() and not regulator_dir.name.startswith('.'):
+                            for doc_dir in regulator_dir.iterdir():
+                                if doc_dir.is_dir() and not doc_dir.name.startswith('.'):
+                                    sections_file = doc_dir / "sections.json"
+                                    if sections_file.exists():
+                                        documents.append(doc_dir)
+                                        print(f"  Found: {category_dir.name}/{regulator_dir.name}/{doc_dir.name}")
+                else:
+                    # Standard: acts/{doc_id}, regulations/{doc_id}
+                    for doc_dir in category_dir.iterdir():
+                        if doc_dir.is_dir() and not doc_dir.name.startswith('.'):
+                            sections_file = doc_dir / "sections.json"
+                            if sections_file.exists():
+                                documents.append(doc_dir)
+                                print(f"  Found: {category_dir.name}/{doc_dir.name}")
 
     if not documents:
         print("❌ Error: No documents found in Silver layer")
