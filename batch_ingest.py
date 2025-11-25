@@ -266,19 +266,10 @@ class BatchIngester:
             if bronze_path.exists():
                 return str(bronze_path)
 
-        # Fallback: fuzzy search all Bronze files
-        # Look for files where the document name is similar
-        doc_id_parts = set(doc_id.split("_"))
-
-        for bronze_file in bronze_base.rglob("raw_text.txt"):
-            parent_name = bronze_file.parent.name.lower()
-            parent_parts = set(parent_name.split("_"))
-
-            # If most of the significant words match, consider it a match
-            if len(doc_id_parts & parent_parts) >= min(3, len(doc_id_parts) * 0.6):
-                return str(bronze_file)
-
+        # No Bronze file found - will trigger PDF extraction
+        # (Fuzzy matching disabled to prevent incorrect matches)
         return None
+
 
     def _infer_document_type(self, category: str, title: str) -> str:
         """Infer document type from category and title."""
