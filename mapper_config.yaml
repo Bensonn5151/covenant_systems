@@ -1,37 +1,105 @@
-# Legislative Mapper Configuration
-# Add act and regulation slugs here to map them automatically
+# Legislative Mapper Configuration - PCMLTFA Core
+#
+# Simplified configuration focusing on essential PCMLTFA compliance documents.
+# This reduces complexity and ensures clean Bronze→Silver→Gold pipeline.
 #
 # The system automatically organizes files:
 #   - Acts → data/raw/acts/
 #   - Regulations → data/raw/regulations/
 
-# Acts to map (will also discover related regulations)
-acts:
-  - "Bank Act"
-  - "Proceeds of Crime (Money Laundering) and Terrorist Financing Act"
-  - "Personal Information Protection and Electronic Documents Act"
-  # Add more acts here as you discover them
-  # - "Privacy Act"
-  # - "Access to Information Act"
+# ============================================================
+# ACT SLUGS (Primary Legislation)
+# ============================================================
 
-# Act slugs (alternative to act names)
 act_slugs:
-  - #"B-1.01"          # Bank Act
-  - "P-24.501"        # PCMLTFA
-  - "P-8.6"           # PIPEDA
-  - "C-3"             # Canada Deposit Insurance Corporation Act (for SOR-2018-57)
-  # Add more act slugs here
-  # - "P-21"          # Privacy Act
-  # - "A-1"           # Access to Information Act
+  # -- CORE: PCMLTFA Framework --
+  - "P-24.501"        # Proceeds of Crime (Money Laundering) and Terrorist Financing Act
 
-# Specific regulations to map (if not auto-discovered from acts)
+  # -- Privacy (Intersection with AML) --
+  - "P-8.6"           # Personal Information Protection and Electronic Documents Act (PIPEDA)
+
+  # -- Banking (Reporting Entities) --
+  - "B-1.01"          # Bank Act
+
+
+# ============================================================
+# REGULATION SLUGS (Implementing Rules)
+# ============================================================
+
 regulation_slugs:
-  - "SOR-2021-181"
-  - "SOR-2018-57"
-  - "SOR-2018-58"
-  - "SOR-2002-184"
-  - "SOR-2001-317"
-  - "SOR-2018-64"
-  # Add more regulation slugs here as you find them
-  # Example:
-  # - "SOR-2016-153"  # PCMLTFA Regulations
+  # -- PCMLTFA Regulations (The Big 5) --
+  - "SOR-2002-184"    # PCMLTF Regulations (Main - customer due diligence, record keeping, reporting)
+  - "SOR-2001-317"    # Suspicious Transaction Reporting Regulations
+  - "SOR-2002-412"    # Cross-border Currency and Monetary Instruments Reporting Regulations
+  - "SOR-2007-121"    # Registration Regulations (Money Services Businesses)
+  - "SOR-2007-292"    # Administrative Monetary Penalties Regulations
+
+
+# ============================================================
+# GUIDANCE DOCUMENTS (Future Implementation)
+# ============================================================
+# NOTE: Guidance downloads are not yet implemented in run_mapper_from_config.py
+# These are documented here for future reference and will require separate
+# scrapers for each regulator (FINTRAC, OSFI, Bank of Canada, FCAC).
+
+guidance:
+  # -- FINTRAC (Financial Transactions and Reports Analysis Centre of Canada) --
+  fintrac:
+    - "Guidance on the Risk-Based Approach"
+    - "Methods to verify the identity of persons and entities"
+    - "Politically exposed persons and heads of international organizations"
+    - "Suspicious transaction reporting requirements"
+    - "Large cash transaction reporting requirements"
+    - "Business relationship requirements"
+    - "Ongoing monitoring requirements"
+    - "Beneficial ownership requirements"
+
+  # -- OSFI (Office of the Superintendent of Financial Institutions) --
+  # Note: Relevant for banks and federally regulated financial institutions
+  osfi:
+    - title: "Integrity and Security Guideline"
+      url: "https://www.osfi-bsif.gc.ca/en/guidance/guidance-library/integrity-security-guideline"
+      published: "2024-01-31"
+      replaces: "Guideline B-8 (Deterring and Detecting Money Laundering and Terrorist Financing)"
+      topics:
+        - "integrity"
+        - "security"
+        - "governance"
+        - "foreign_interference"
+        - "cyber_security"
+        - "third_party_risk"
+      applicability: "All federally regulated financial institutions"
+      notes: "Superseded B-8 in January 2024. Broader scope covering integrity, ethics, physical/cyber security, and protection against malicious activity."
+
+  # Future: Add guidance as needed for AML/ATF compliance
+
+
+# ============================================================
+# CONFIGURATION NOTES
+# ============================================================
+#
+# This simplified configuration focuses on:
+# 1. PCMLTFA compliance (core AML/ATF framework)
+# 2. Related privacy obligations (PIPEDA intersection)
+# 3. Banking sector context (primary reporting entities)
+#
+# Excluded to reduce complexity:
+# - Sanctions-related acts (SEMA, Magnitsky Law)
+# - CDIC Act (not core to PCMLTFA)
+# - Additional PCMLTFA regulations (Goods Reporting)
+# - Privacy breach regulations (PIPEDA Breach)
+# - Sanctions regulations (Russia, Iran)
+#
+# Total Documents:
+# - Acts: 3 (PCMLTFA, PIPEDA, Bank Act)
+# - Regulations: 5 (PCMLTFA Big 5)
+# - Guidance: 8 (FINTRAC-focused)
+# - TOTAL: 16 core PCMLTFA documents
+#
+# Benefits of simplified scope:
+# - Faster ingestion and embedding generation
+# - Cleaner Bronze→Silver→Gold pipeline
+# - No fuzzy matching errors
+# - Focused on essential compliance requirements
+#
+# ============================================================

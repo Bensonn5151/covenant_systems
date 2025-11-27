@@ -1,68 +1,23 @@
 """
 Universal PDF Ingestion Test Script
 
-Processes any PDF through the ingestion pipeline.
-Auto-detects bilingual PDFs and extracts accordingly.
+Processes any PDF through the ingestion pipeline using Adobe PDF Services.
+Supports bilingual PDFs (English/French dual columns).
 
 Usage:
-    python3 test_ingestion.py <pdf_path> [--bilingual]
+    python3 test_ingestion.py <pdf_path> --category <category> [--bilingual] [--regulator <regulator>] [--parent-act <act>] [--company-id <id>]
 
 Examples:
-    python3 test_ingestion.py data/raw/bank_act.pdf --bilingual
-    python3 test_ingestion.py data/raw/sec_regulation.pdf
-    python3 test_ingestion.py storage/bronze/bank_act_canada.pdf --bilingual
+    python3 test_ingestion.py data/raw/privacy_act.pdf --category act --bilingual
+    python3 test_ingestion.py data/raw/osfi_b13.pdf --category guidance --regulator OSFI
+    python3 test_ingestion.py data/raw/policy.pdf --category policy --company-id acme_corp
 """
 
 import sys
 import json
+import argparse
 from pathlib import Path
 from ingestion.pipeline import IngestionPipeline
-
-
-def detect_bilingual_pdf(pdf_path: str) -> bool:
-    """
-    Auto-detect if PDF is likely bilingual by checking text distribution.
-
-    Simple heuristic: if PDF has significant text in both left and right halves,
-    it's likely bilingual.
-    """
-    try:
-        import pdfplumber
-
-        with pdfplumber.open(pdf_path) as pdf:
-            # Sample first page
-            if len(pdf.pages) == 0:
-                return False
-
-            page = pdf.pages[0]
-            words = page.extract_words()
-
-            if not words:
-                return False
-
-            page_width = page.width
-            midpoint = page_width / 2
-
-            # Count words in left vs right half
-            left_words = sum(1 for w in words if w["x0"] < midpoint)
-            right_words = sum(1 for w in words if w["x0"] >= midpoint)
-
-            # If both halves have significant text, likely bilingual
-            total_words = left_words + right_words
-            if total_words == 0:
-                return False
-
-            left_ratio = left_words / total_words
-            right_ratio = right_words / total_words
-
-            # Both sides have >30% of words -> bilingual
-            if left_ratio > 0.3 and right_ratio > 0.3:
-                return True
-
-    except Exception as e:
-        print(f"Warning: Could not auto-detect bilingual layout: {e}")
-
-    return False
 
 
 def infer_metadata(pdf_path: str):
@@ -102,39 +57,38 @@ def main():
     """Main test function."""
 
     # Parse arguments
-    if len(sys.argv) < 2:
-        print("Error: No PDF path provided")
-        print("\nUsage:")
-        print("  python3 test_ingestion.py <pdf_path> [--bilingual]")
-        print("\nExamples:")
-        print("  python3 test_ingestion.py data/raw/bank_act.pdf --bilingual")
-        print("  python3 test_ingestion.py storage/bronze/bank_act_canada.pdf --bilingual")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Process PDF through ingestion pipeline")
+    parser.add_argument("pdf_path", help="Path to PDF file")
+    parser.add_argument("--category", required=True, choices=["act", "regulation", "guidance", "policy"],
+                        help="Document category (required)")
+    parser.add_argument("--bilingual", action="store_true",
+                        help="PDF has dual columns (English/French) - extract left column only using Adobe")
+    parser.add_argument("--regulator", choices=["OSFI", "FINTRAC", "OPC", "FCAC"],
+                        help="Regulator (required for guidance documents)")
+    parser.add_argument("--parent-act", choices=["Bank Act", "PCMLTFA", "PIPEDA"],
+                        help="Parent act (required for regulations)")
+    parser.add_argument("--company-id", help="Company ID (required for policies)")
 
-    pdf_path = sys.argv[1]
-    force_bilingual = "--bilingual" in sys.argv
+    args = parser.parse_args()
+
+    # Validate category-specific requirements
+    if args.category == "guidance" and not args.regulator:
+        parser.error("--regulator is required when category is 'guidance'")
+    if args.category == "regulation" and not args.parent_act:
+        parser.error("--parent-act is required when category is 'regulation'")
+    if args.category == "policy" and not args.company_id:
+        parser.error("--company-id is required when category is 'policy'")
 
     # Check if file exists
-    if not Path(pdf_path).exists():
-        print(f"Error: File not found: {pdf_path}")
+    if not Path(args.pdf_path).exists():
+        print(f"Error: File not found: {args.pdf_path}")
         sys.exit(1)
 
-    # Auto-detect bilingual if not forced
-    if force_bilingual:
-        is_bilingual = True
-        print("Using bilingual extraction (forced)")
-    else:
-        print("Auto-detecting PDF layout...")
-        is_bilingual = detect_bilingual_pdf(pdf_path)
-        if is_bilingual:
-            print("✓ Bilingual PDF detected - will extract English only")
-        else:
-            print("✓ Regular PDF detected - will extract all text")
-
     # Infer metadata
-    doc_type, jurisdiction = infer_metadata(pdf_path)
+    doc_type, jurisdiction = infer_metadata(args.pdf_path)
     print(f"Inferred document type: {doc_type}")
     print(f"Inferred jurisdiction: {jurisdiction}")
+    print(f"Category: {args.category}")
 
     # Initialize pipeline
     pipeline = IngestionPipeline(
@@ -144,14 +98,18 @@ def main():
 
     # Process the document
     print("\n" + "=" * 60)
-    print(f"PROCESSING: {Path(pdf_path).name}")
+    print(f"PROCESSING: {Path(args.pdf_path).name}")
     print("=" * 60)
 
     result = pipeline.process_document(
-        pdf_path=pdf_path,
+        pdf_path=args.pdf_path,
         document_type=doc_type,
         jurisdiction=jurisdiction,
-        is_bilingual=is_bilingual,
+        is_bilingual=args.bilingual,
+        manual_category=args.category,
+        regulator=args.regulator,
+        parent_act=args.parent_act,
+        company_id=args.company_id,
     )
 
     # Display results
@@ -162,7 +120,8 @@ def main():
     print(f"Total characters: {result['total_chars']:,}")
     print(f"Sections extracted: {result['sections_count']}")
     print(f"Needed OCR: {result['needs_ocr']}")
-    print(f"Bilingual extraction: {is_bilingual}")
+    print(f"Bilingual extraction: {args.bilingual}")
+    print(f"Extraction method: Adobe PDF Services")
     print(f"\nBronze location: {result['bronze']['bronze_file']}")
     print(f"Silver location: {result['silver']['silver_file']}")
     print("=" * 60)

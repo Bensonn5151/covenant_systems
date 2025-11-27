@@ -423,6 +423,9 @@ class AdvancedSegmenter:
         """Extract sections maintaining hierarchical structure."""
         sections = []
         parent_stack = []  # Track parent sections for hierarchy
+        
+        # Extract document name for title enrichment
+        doc_name_prefix = self._get_document_prefix(metadata, document_id)
 
         for i, marker in enumerate(markers):
             # Determine boundaries
@@ -434,6 +437,10 @@ class AdvancedSegmenter:
 
             # Split into title and body
             title, body = self._smart_title_body_split(section_text, marker)
+            
+            # Enrich title with document context (e.g., "PCMLTFA > Section 9.2")
+            if doc_name_prefix and not title.startswith(doc_name_prefix):
+                title = f"{doc_name_prefix} > {title}"
 
             # Extract citations from body
             citations = self._extract_citations(body)
@@ -444,8 +451,11 @@ class AdvancedSegmenter:
             # Determine parent
             parent_id = self._find_parent(marker, parent_stack)
 
-            # Create section with TOC detection
+            # Create section with TOC detection and merge document-level metadata
+            # Start with document-level metadata (document_id, category, jurisdiction, etc.)
             section_metadata = metadata.copy() if metadata else {}
+            
+            # Add section-specific metadata (is_toc flag)
             section_metadata["is_toc"] = is_toc_section(title, body)
 
             section = Section(
@@ -468,6 +478,83 @@ class AdvancedSegmenter:
             self._update_parent_stack(parent_stack, section, marker)
 
         return sections
+    
+    def _get_document_prefix(self, metadata: Optional[Dict], document_id: str) -> str:
+        """
+        Extract a short document name prefix for section titles.
+        
+        Args:
+            metadata: Document metadata
+            document_id: Document identifier
+            
+        Returns:
+            Short document name (e.g., "PCMLTFA", "Bank Act", "FINTRAC Guidance")
+        """
+        if not metadata:
+            return ""
+        
+        # Try to get parent_act first (for regulations)
+        parent_act = metadata.get("parent_act", "")
+        if parent_act:
+            # Shorten common act names
+            if "money laundering" in parent_act.lower():
+                return "PCMLTFA"
+            elif "bank act" in parent_act.lower():
+                return "Bank Act"
+            elif "pipeda" in parent_act.lower() or "personal information" in parent_act.lower():
+                return "PIPEDA"
+            # Use first 3 words of parent act
+            words = parent_act.split()
+            return " ".join(words[:3]) if len(words) > 3 else parent_act
+        
+        # Try document_type + category
+        doc_type = metadata.get("document_type", "")
+        category = metadata.get("category", "")
+        
+        # For guidance documents, check if it's FINTRAC
+        if category == "guidance" and "fintrac" in document_id.lower():
+            return "FINTRAC"
+        
+        # For acts, try to extract short name from document_id
+        if category == "act":
+            # Extract from document_id like "s.c.2000_c._17_proceeds_of_crime..."
+            if "proceeds_of_crime" in document_id:
+                return "PCMLTFA"
+            elif "bank_act" in document_id:
+                return "Bank Act"
+            elif "personal_information" in document_id:
+                return "PIPEDA"
+            elif "special_economic_measures" in document_id:
+                return "SEMA"
+            elif "magnitsky" in document_id:
+                return "Magnitsky Law"
+            elif "deposit_insurance" in document_id:
+                return "CDIC Act"
+        
+        # For regulations, extract from document_id
+        if category == "regulation":
+            if "sor-2002-184" in document_id:
+                return "PCMLTFA Regs"
+            elif "sor-2001-317" in document_id:
+                return "PCMLTFA STR"
+            elif "sor-2002-412" in document_id:
+                return "Cross-Border"
+            elif "sor-2007-121" in document_id:
+                return "MSB Registration"
+            elif "sor-2007-292" in document_id:
+                return "AMPs"
+            elif "sor-2010-165" in document_id:
+                return "Iran Sanctions"
+            elif "sor-2014-58" in document_id:
+                return "Russia Sanctions"
+            elif "sor-2018-64" in document_id:
+                return "PIPEDA Breach"
+            elif "sor-2025-67" in document_id:
+                return "Goods Reporting"
+        
+        # Fallback: return empty string (no prefix)
+        return ""
+
 
     def _smart_title_body_split(
         self,
