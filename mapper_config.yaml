@@ -19,7 +19,7 @@ act_slugs:
   - "P-8.6"           # Personal Information Protection and Electronic Documents Act (PIPEDA)
 
   # -- Banking (Reporting Entities) --
-  - "B-1.01"          # Bank Act
+  # - "B-1.01"          # Bank Act
 
 
 # ============================================================
