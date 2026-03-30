@@ -1,7 +1,8 @@
-# Legislative Mapper Configuration - PCMLTFA Core
+# Legislative Mapper Configuration - AML + Data Privacy
 #
-# Simplified configuration focusing on essential PCMLTFA compliance documents.
-# This reduces complexity and ensures clean Bronze→Silver→Gold pipeline.
+# Configuration for Canadian regulatory compliance covering:
+#   1. AML/ATF (PCMLTFA + FINTRAC)
+#   2. Data Privacy (PIPEDA + Privacy Act + OPC)
 #
 # The system automatically organizes files:
 #   - Acts → data/raw/acts/
@@ -15,8 +16,9 @@ act_slugs:
   # -- CORE: PCMLTFA Framework --
   - "P-24.501"        # Proceeds of Crime (Money Laundering) and Terrorist Financing Act
 
-  # -- Privacy (Intersection with AML) --
+  # -- Privacy & Data Protection --
   - "P-8.6"           # Personal Information Protection and Electronic Documents Act (PIPEDA)
+  - "P-21"            # Privacy Act (R.S.C. 1985, c. P-21) — federal public sector privacy
 
   # -- Banking (Reporting Entities) --
   # - "B-1.01"          # Bank Act
@@ -34,13 +36,16 @@ regulation_slugs:
   - "SOR-2007-121"    # Registration Regulations (Money Services Businesses)
   - "SOR-2007-292"    # Administrative Monetary Penalties Regulations
 
+  # -- PIPEDA / Privacy Regulations --
+  - "SOR-2018-64"     # Breach of Security Safeguards Regulations (mandatory breach reporting)
+  - "SOR-2001-7"      # PIPEDA Regulations (Electronic Documents)
+
 
 # ============================================================
-# GUIDANCE DOCUMENTS (Future Implementation)
+# GUIDANCE DOCUMENTS
 # ============================================================
-# NOTE: Guidance downloads are not yet implemented in run_mapper_from_config.py
-# These are documented here for future reference and will require separate
-# scrapers for each regulator (FINTRAC, OSFI, Bank of Canada, FCAC).
+# NOTE: Guidance downloads require separate scrapers per regulator.
+# See: scrape_fintrac.py, scrape_opc.py
 
 guidance:
   # -- FINTRAC (Financial Transactions and Reports Analysis Centre of Canada) --
@@ -54,8 +59,17 @@ guidance:
     - "Ongoing monitoring requirements"
     - "Beneficial ownership requirements"
 
+  # -- OPC (Office of the Privacy Commissioner of Canada) --
+  opc:
+    - "Guidelines for obtaining meaningful consent"
+    - "What you need to know about mandatory reporting of breaches of security safeguards"
+    - "Guidance on inappropriate data practices"
+    - "PIPEDA Fair Information Principles"
+    - "Guidance on privacy and artificial intelligence"
+    - "Guidelines for processing personal data across borders"
+    - "Expectations for organizations relating to online consent"
+
   # -- OSFI (Office of the Superintendent of Financial Institutions) --
-  # Note: Relevant for banks and federally regulated financial institutions
   osfi:
     - title: "Integrity and Security Guideline"
       url: "https://www.osfi-bsif.gc.ca/en/guidance/guidance-library/integrity-security-guideline"
@@ -71,35 +85,27 @@ guidance:
       applicability: "All federally regulated financial institutions"
       notes: "Superseded B-8 in January 2024. Broader scope covering integrity, ethics, physical/cyber security, and protection against malicious activity."
 
-  # Future: Add guidance as needed for AML/ATF compliance
-
 
 # ============================================================
 # CONFIGURATION NOTES
 # ============================================================
 #
-# This simplified configuration focuses on:
-# 1. PCMLTFA compliance (core AML/ATF framework)
-# 2. Related privacy obligations (PIPEDA intersection)
-# 3. Banking sector context (primary reporting entities)
+# This configuration covers two compliance verticals:
 #
-# Excluded to reduce complexity:
-# - Sanctions-related acts (SEMA, Magnitsky Law)
-# - CDIC Act (not core to PCMLTFA)
-# - Additional PCMLTFA regulations (Goods Reporting)
-# - Privacy breach regulations (PIPEDA Breach)
-# - Sanctions regulations (Russia, Iran)
+# 1. AML/ATF (Anti-Money Laundering / Anti-Terrorist Financing)
+#    - PCMLTFA + 5 implementing regulations
+#    - 8 FINTRAC guidance documents
+#
+# 2. Data Privacy (Canadian Federal)
+#    - PIPEDA (private sector) + Privacy Act (public sector)
+#    - Breach of Security Safeguards Regulations (SOR-2018-64)
+#    - PIPEDA Regulations (SOR-2001-7)
+#    - 7 OPC guidance documents
 #
 # Total Documents:
-# - Acts: 3 (PCMLTFA, PIPEDA, Bank Act)
-# - Regulations: 5 (PCMLTFA Big 5)
-# - Guidance: 8 (FINTRAC-focused)
-# - TOTAL: 16 core PCMLTFA documents
-#
-# Benefits of simplified scope:
-# - Faster ingestion and embedding generation
-# - Cleaner Bronze→Silver→Gold pipeline
-# - No fuzzy matching errors
-# - Focused on essential compliance requirements
+# - Acts: 3 (PCMLTFA, PIPEDA, Privacy Act)
+# - Regulations: 7 (5 PCMLTFA + 2 PIPEDA/Privacy)
+# - Guidance: 15+ (8 FINTRAC + 7 OPC)
+# - TOTAL: ~25 core compliance documents
 #
 # ============================================================

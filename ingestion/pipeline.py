@@ -11,6 +11,7 @@ This is the main entry point for document ingestion.
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Dict, Optional
 from datetime import datetime
@@ -256,6 +257,12 @@ class IngestionPipeline:
         # NOTE: We filter here at the document level, so no need to filter again during segmentation
         text_already_filtered = False
 
+        # Auto-detect bilingual for Canadian documents if not explicitly set
+        if not is_bilingual and jurisdiction.lower() in ("canada", "federal"):
+            if self._detect_bilingual(final_text):
+                is_bilingual = True
+                print("\nSTEP 2.5: Auto-detected bilingual document (Canadian jurisdiction)")
+
         if is_bilingual:
             print("\nSTEP 2.5: Filtering to English (bilingual document detected)...")
             lang_preprocessor = LanguagePreprocessor(target_lang='en')
@@ -467,6 +474,52 @@ class IngestionPipeline:
             "silver_file": str(sections_file),
             "metadata_file": str(metadata_file),
         }
+
+    @staticmethod
+    def _detect_bilingual(text: str) -> bool:
+        """
+        Detect if text is bilingual (English/French) Canadian government document.
+
+        Uses two signals:
+        1. French function word ratio in the text
+        2. Presence of known bilingual header patterns (e.g. parallel EN/FR titles)
+
+        Args:
+            text: Document text to analyze
+
+        Returns:
+            True if document appears bilingual
+        """
+        sample = text[:20000]
+        words = sample.split()
+        if len(words) < 50:
+            return False
+
+        # Signal 1: French function words ratio (threshold 0.08 — these docs are ~10% French words)
+        french_indicators = re.findall(
+            r'\b(la|le|les|des|une|est|sont|aux|dans|sur|par|pour|cette|avec|qui|que|du|en|ou|'
+            r'Loi|loi|article|alinéa|paragraphe|règlement|partie|chapitre|dispositions|'
+            r'renseignements|personnels|protection|commissaire)\b',
+            sample,
+        )
+        ratio = len(french_indicators) / len(words)
+
+        # Signal 2: Bilingual header markers typical of Justice Canada publications
+        bilingual_markers = [
+            r'À jour au',
+            r'Dernière modification le',
+            r'Codification',
+            r'L\.C\.\s+\d{4}',
+            r'ch\.\s+\d+',
+            r'Publié par le ministre',
+            r'PARTIE\s+\d+',
+            r'ANNEXE\s+\d+',
+        ]
+        marker_count = sum(
+            1 for p in bilingual_markers if re.search(p, sample)
+        )
+
+        return ratio > 0.07 or marker_count >= 3
 
     def _clean_bronze_text(self, text: str) -> str:
         """

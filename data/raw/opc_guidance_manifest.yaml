@@ -1,0 +1,120 @@
+# OPC (Office of the Privacy Commissioner) Guidance Manifest
+# For use with: python3 scrape_opc.py data/raw/opc_guidance_manifest.yaml --format text
+#
+# Source: priv.gc.ca — Canada's federal privacy regulator
+# Parent legislation: PIPEDA (S.C. 2000, c. 5) and Privacy Act (R.S.C. 1985, c. P-21)
+
+documents:
+- filename: OPC - Guidelines for Obtaining Meaningful Consent.pdf
+  category: guidance
+  regulator: OPC
+  title: "Guidelines for obtaining meaningful consent"
+  source_url: https://www.priv.gc.ca/en/privacy-topics/collecting-personal-information/consent/gl_omc_201805/
+  parent_act: Personal Information Protection and Electronic Documents Act (S.C. 2000, c. 5)
+  jurisdiction: federal
+  content_type: html_guidance
+  status: current
+  topics:
+  - consent
+  - collection
+  - transparency
+  priority: 1
+
+- filename: OPC - Breach of Security Safeguards Reporting.pdf
+  category: guidance
+  regulator: OPC
+  title: "What you need to know about mandatory reporting of breaches of security safeguards"
+  source_url: https://www.priv.gc.ca/en/privacy-topics/business-privacy/safeguards-and-breaches/privacy-breaches/respond-to-a-privacy-breach-at-your-business/gd_pb_201810/
+  parent_act: Personal Information Protection and Electronic Documents Act (S.C. 2000, c. 5)
+  jurisdiction: federal
+  content_type: html_guidance
+  status: current
+  topics:
+  - breach notification
+  - security safeguards
+  - reporting
+  priority: 1
+
+- filename: OPC - Inappropriate Data Practices.pdf
+  category: guidance
+  regulator: OPC
+  title: "Guidance on inappropriate data practices: Interpretation and application of subsection 5(3)"
+  source_url: https://www.priv.gc.ca/en/privacy-topics/collecting-personal-information/consent/gd_53_201805/
+  parent_act: Personal Information Protection and Electronic Documents Act (S.C. 2000, c. 5)
+  jurisdiction: federal
+  content_type: html_guidance
+  status: current
+  topics:
+  - inappropriate practices
+  - consent
+  - limits on collection
+  priority: 1
+
+- filename: OPC - Privacy and AI.pdf
+  category: guidance
+  regulator: OPC
+  title: "Principles for responsible, trustworthy and privacy-protective generative AI technologies"
+  source_url: https://www.priv.gc.ca/en/privacy-topics/technology/artificial-intelligence/gd_principles_ai/
+  parent_act: Personal Information Protection and Electronic Documents Act (S.C. 2000, c. 5)
+  jurisdiction: federal
+  content_type: html_guidance
+  status: current
+  topics:
+  - artificial intelligence
+  - automated decision-making
+  - transparency
+  - accountability
+  priority: 1
+
+- filename: OPC - Cross-border Transfer of Personal Information.pdf
+  category: guidance
+  regulator: OPC
+  title: "Guidelines for processing personal data across borders"
+  source_url: https://www.priv.gc.ca/en/privacy-topics/international-privacy-issues/gl_dab_090127/
+  parent_act: Personal Information Protection and Electronic Documents Act (S.C. 2000, c. 5)
+  jurisdiction: federal
+  content_type: html_guidance
+  status: current
+  topics:
+  - cross-border transfers
+  - third party processing
+  - accountability
+  priority: 1
+
+- filename: OPC - Privacy Impact Assessments.pdf
+  category: guidance
+  regulator: OPC
+  title: "Expectations for meaningful privacy impact assessments"
+  source_url: https://www.priv.gc.ca/en/privacy-topics/privacy-impact-assessments/gd_exp_pia/
+  parent_act: Personal Information Protection and Electronic Documents Act (S.C. 2000, c. 5)
+  jurisdiction: federal
+  content_type: html_guidance
+  status: current
+  topics:
+  - privacy impact assessment
+  - risk management
+  - accountability
+  priority: 2
+
+- filename: OPC - Ten Fair Information Principles.pdf
+  category: guidance
+  regulator: OPC
+  title: "PIPEDA fair information principles"
+  source_url: https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/p_principle/
+  parent_act: Personal Information Protection and Electronic Documents Act (S.C. 2000, c. 5)
+  jurisdiction: federal
+  content_type: html_guidance
+  status: current
+  topics:
+  - fair information principles
+  - Schedule 1
+  - accountability
+  - consent
+  - limiting collection
+  - limiting use
+  - accuracy
+  - safeguards
+  - openness
+  - individual access
+  - challenging compliance
+  priority: 1
