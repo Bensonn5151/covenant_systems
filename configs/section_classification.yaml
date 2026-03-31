@@ -1,0 +1,99 @@
+# Section Classification Rules for Canadian Privacy Legislation
+#
+# Rule-based classification using regex patterns on legal modal verbs.
+# Used by: ingestion/classify/section_classifier.py, risk_scorer.py
+
+classification:
+  obligation:
+    patterns:
+      - '\bshall\b'
+      - '\bmust\b'
+      - '\bis required to\b'
+      - '\bare required to\b'
+      - '\bis obligated to\b'
+      - '\bensure that\b'
+    min_confidence: 0.75
+
+  prohibition:
+    patterns:
+      - '\bshall not\b'
+      - '\bmust not\b'
+      - '\bmay not\b'
+      - '\bprohibited\b'
+      - '\bis not permitted\b'
+      - '\bno person shall\b'
+      - '\bno organization shall\b'
+    min_confidence: 0.80
+
+  permission:
+    patterns:
+      - '\bmay\b(?!\s+not\b)'
+      - '\bis entitled to\b'
+      - '\bhas the right\b'
+      - '\bis authorized to\b'
+      - '\bis permitted to\b'
+    min_confidence: 0.70
+
+  definition:
+    patterns:
+      - '\bmeans\b'
+      - '\bis defined as\b'
+      - '\binterpretation\b'
+    min_confidence: 0.85
+
+  procedural:
+    patterns:
+      - '\bshall be filed\b'
+      - '\bnotice shall be given\b'
+      - '\bwithin \d+ days\b'
+      - '\bin the prescribed form\b'
+      - '\bcoming into force\b'
+      - '\bapplication of\b'
+    min_confidence: 0.65
+
+risk_scoring:
+  high:
+    patterns:
+      - '\boffence\b'
+      - '\bpenalt(?:y|ies)\b'
+      - '\bfine\b'
+      - '\bimprisonment\b'
+      - '\bbreach\b'
+      - '\bprohibited\b'
+      - '\bshall not\b'
+      - '\bmust not\b'
+      - '\bsecurity safeguards?\b'
+      - '\bnotif(?:y|ication)\b.*\bbreach\b'
+  medium:
+    patterns:
+      - '\bshall\b'
+      - '\bmust\b'
+      - '\bis required\b'
+      - '\bobligation\b'
+      - '\bconsent\b'
+      - '\bpurpose\b.*\bcollect'
+  low:
+    patterns:
+      - '\bmay\b'
+      - '\bmeans\b'
+      - '\bdefinition\b'
+      - '\binterpretation\b'
+      - '\bshort title\b'
+
+operational_areas:
+  data_collection:
+    patterns: ['\bcollect', '\bgather', '\bobtain.*personal information']
+  consent:
+    patterns: ['\bconsent', '\bknowledge and consent']
+  data_use:
+    patterns: ['\buse\b.*personal information', '\bpurpose.*\buse\b']
+  data_disclosure:
+    patterns: ['\bdisclos', '\bshare.*personal information']
+  data_retention:
+    patterns: ['\bretain', '\bretention', '\bdestro', '\bdispos']
+  breach_notification:
+    patterns: ['\bbreach', '\bnotif.*breach', '\bsafeguard']
+  access_rights:
+    patterns: ['\baccess\b.*personal information', '\bright of access', '\brequest.*access']
+  accountability:
+    patterns: ['\baccountab', '\bdesignat.*officer', '\bresponsib']
