@@ -25,12 +25,82 @@ Visual documentation of data transformation at each stage.
 
 ---
 
+## Bilingual Extraction (Canadian Documents)
+
+Canadian government PDFs from Justice Canada (`laws-lois.justice.gc.ca`) are published
+with English (left column) and French (right column) side-by-side on each page.
+Extracting clean English text requires **spatial column extraction** — not language
+detection — because the two languages are interleaved within the same lines when
+extracted as flat text.
+
+### Extraction Methods (Ranked by Reliability)
+
+| Priority | Tool | File | Method | When to Use |
+|----------|------|------|--------|-------------|
+| **1st** | **BilingualExtractor** | `ingestion/extract/bilingual_extractor.py` | pdfplumber detects column gap, PyMuPDF clips left half via `fitz.Rect` | **Default for all Canadian bilingual PDFs.** Runs locally, no API, handles any PDF size. |
+| **2nd** | **Adobe PDF Services** | `ingestion/extract/adobe_pdf_extractor.py` | Cloud API with `extract_left_column_only=True` | Fallback if local extraction has layout issues. Unreliable for large PDFs (timeouts, 500 errors on 70+ page docs). |
+| **3rd** | **langdetect** | `ingestion/preprocessors/language_filter.py` | Splits text into sentences, classifies each with n-gram probability models | **Only works when EN/FR are in separate paragraphs** (e.g., OPC guidance). Fails completely on side-by-side column PDFs because EN+FR are interleaved within the same sentence. |
+
+### Why langdetect Fails on Column PDFs
+
+When PyPDF2 or Adobe (full-page mode) extracts a bilingual PDF, the two columns merge:
+
+```
+(a) give written notice to the individual who made the
+request as to whether or not access to the information a) d'aviser par écrit la personne
+```
+
+This is **one sentence** containing both languages. `langdetect` classifies it as English
+(majority language) and keeps the French fragments. No sentence-level filter can fix this.
+
+### How BilingualExtractor Works
+
+```
+1. pdfplumber opens PDF, samples first 3 pages
+2. Extracts word positions (x-coordinates)
+3. Finds the largest horizontal gap near the middle → column boundary (e.g., 301.6pt)
+4. PyMuPDF clips each page to fitz.Rect(0, 0, boundary, page_height)
+5. Extracts text only from that rectangle → English only
+6. French column is never read
+```
+
+### Pipeline Flow for Canadian Docs
+
+```
+Bilingual PDF
+    │
+    ├─ BilingualExtractor (local, pdfplumber + PyMuPDF)
+    │   └─ Clips left column spatially → English-only text
+    │
+    ▼
+  BRONZE (raw_text.txt = English only)
+    │
+    ├─ _detect_bilingual() checks if langdetect filtering is also needed
+    │   └─ Usually not — column extraction already removed French
+    │
+    ▼
+  AdvancedSegmenter (text-pattern regex)
+    │
+    ▼
+  SILVER (sections.json = structured English sections)
+```
+
+### Results Comparison
+
+| Document | Method | Sections | French Residue |
+|----------|--------|----------|---------------|
+| PIPEDA | Adobe `left_column_only` | 205 | 0.18% |
+| Privacy Act | PyPDF2 + langdetect | 90 | **1.49%** (broken) |
+| Privacy Act | BilingualExtractor | 216 | **0.01%** (clean) |
+
+---
+
 ## Stage 1: BRONZE LAYER (Raw Extraction)
 
 ### Input → Bronze Transformation
 
 ```
-PDF → pdfplumber (detect columns) → PyMuPDF (extract left) → Bronze
+PDF → BilingualExtractor (detect columns) → PyMuPDF (extract left) → Bronze
 ```
 
 ### Bronze Output Structure

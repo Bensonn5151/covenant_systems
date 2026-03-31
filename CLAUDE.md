@@ -126,16 +126,29 @@ OCR is not used when:
 Claude must:
 	1.	Detect whether PDF contains text
 	2.	If scanned → apply OCR
-	3.	Extract content
-	4.	Identify sections using hierarchical markers:
+	3.	If bilingual (Canadian jurisdiction) → use BilingualExtractor for spatial column extraction
+	4.	Extract content
+	5.	Identify sections using hierarchical markers:
 	•	“1.”, “2.”
 	•	“1.1”, “1.2.3”
 	•	“Section 5”
 	•	“Part II”
-	5.	Produce section-level JSON for Silver
-	6.	Embed sections for Gold
+	6.	Produce section-level JSON for Silver
+	7.	Embed sections for Gold
 
 If extractor fails → fallback to a large document splitter + manual section detection.
+
+### 4.1 Bilingual Extraction (Canadian Documents)
+
+Canadian government PDFs have English (left) and French (right) columns side-by-side.
+These MUST be extracted using spatial column clipping, NOT language detection.
+
+Extraction priority:
+	1.	BilingualExtractor (ingestion/extract/bilingual_extractor.py) — pdfplumber + PyMuPDF, local, no API
+	2.	Adobe PDF Services with extract_left_column_only=True — cloud API fallback
+	3.	langdetect (ingestion/preprocessors/language_filter.py) — ONLY for documents where EN/FR are in separate paragraphs (e.g., HTML guidance docs). Does NOT work on side-by-side column PDFs.
+
+See docs/PIPELINE_STAGES.md for detailed comparison and results.
 
 ## 5. FOLDER STRUCTURE
 
