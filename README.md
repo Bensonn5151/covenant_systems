@@ -1,7 +1,7 @@
 # Covenant Systems — Regulatory Intelligence Platform
 
-**Version:** 0.2.0 (Bronze → Silver → Gold → Search)  
-**Last Updated:** 2025-11-24
+**Version:** 0.3.0 (Bronze → Silver → Gold → Knowledge Graph)  
+**Last Updated:** 2026-04-02
 
 ---
 
@@ -118,9 +118,23 @@ Data Sources (laws.justice.gc.ca, FINTRAC)
    - 9 Regulations (PCMLTFA regs, sanctions, privacy)
    - 8 FINTRAC Guidance documents
 
-### 🚧 In Development (Milestone 1)
+5. **Knowledge Graph (Operational)**
+   - 509 nodes and 121 edges across regulatory corpus
+   - Cross-document relationship mapping (cites, requires, implements)
+   - Domain taxonomy covering AML, KYC, PIPEDA, and more
 
-- Knowledge Graph construction (nodes, edges, relationships)
+6. **Bilingual Extraction Pipeline**
+   - Spatial column clipping for side-by-side EN/FR Canadian PDFs
+   - BilingualExtractor using pdfplumber + PyMuPDF (no API dependency)
+   - Language-filtered output (English-only sections)
+
+7. **Gold Layer Enrichment**
+   - Classification labels (obligation, permission, prohibition)
+   - Risk-level tagging per section
+   - RAG-ready vectors with semantic labels
+
+### 🚧 In Development
+
 - Graph-augmented retrieval (semantic + graph traversal)
 - Impact analysis engine (regulatory change detection)
 - Explainable reasoning interface
