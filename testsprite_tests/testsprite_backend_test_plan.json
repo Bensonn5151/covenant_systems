@@ -1,0 +1,42 @@
+[
+  {
+    "id": "TC001",
+    "title": "ingest_pdf_document_pipeline",
+    "description": "Test the POST /ingest endpoint to verify processing a single PDF document through the full Bronze-Silver-Gold pipeline, including handling bilingual documents, correct metadata inference, section segmentation, and embedding generation. Validate successful response with document_id, sections_count, and status. Also test error handling for invalid PDF or missing parameters."
+  },
+  {
+    "id": "TC002",
+    "title": "batch_document_processing_from_manifest",
+    "description": "Test the POST /batch-ingest endpoint to process multiple documents defined in a YAML manifest with dependency ordering. Verify that the pipeline runs for each document and returns correct processed_count, failed_count, and per-document results. Also test error handling when manifest contains missing files or causes pipeline errors."
+  },
+  {
+    "id": "TC003",
+    "title": "legislation_discovery_and_download",
+    "description": "Test the POST /discover endpoint to discover and download legislation by act name or slug. Verify successful discovery returns discovered_count and manifest_entries with correct source URLs and saved paths. Also test handling of nonexistent acts returning 404 error."
+  },
+  {
+    "id": "TC004",
+    "title": "semantic_search_over_gold_embeddings",
+    "description": "Test the GET /search endpoint to perform FAISS-powered semantic similarity search over Gold-layer section embeddings. Verify that queries return top-K relevant sections with section_id, title, body, score, and document fields. Also test error handling when the index is not loaded returning 500 error."
+  },
+  {
+    "id": "TC005",
+    "title": "knowledge_graph_building_from_manifest",
+    "description": "Test the POST /build-kg endpoint to build and maintain a YAML-based regulatory knowledge graph from manifest relationships. Verify successful response includes nodes_count and edges_count. Also test error handling for corrupt manifests causing KG build errors."
+  },
+  {
+    "id": "TC006",
+    "title": "data_validation_checks",
+    "description": "Test the GET /validate endpoint to run validation checks on manifest integrity and Bronze/Silver/Gold schema compliance. Verify responses indicating valid status with errors and warnings arrays. Also test handling of validation service unavailability returning 500 error."
+  },
+  {
+    "id": "TC007",
+    "title": "email_signup_submission",
+    "description": "Test the POST /api/submit-email endpoint to submit emails for waitlist signup. Verify successful submissions return success true. Test validation errors for invalid email formats returning 400 error. Also test server error handling returning 500 error."
+  },
+  {
+    "id": "TC008",
+    "title": "web_scraping_of_regulatory_content",
+    "description": "Test the POST /scrape endpoint to scrape regulatory content from configured sources like FINTRAC and OPC. Verify successful scraping returns pages_scraped count and list of files_saved. Also test error handling for unsupported sources returning 500 scraping error."
+  }
+]

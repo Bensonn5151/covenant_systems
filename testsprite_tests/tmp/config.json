@@ -1,0 +1,19 @@
+{
+  "status": "commited",
+  "type": "backend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:8000",
+  "backendAuthType": "public",
+  "executionArgs": {
+    "projectName": "covenant_systems",
+    "projectPath": "/Users/apple/Desktop/DEV/covenant_systems",
+    "testIds": [],
+    "additionalInstruction": "Round 2 re-test after bug fixes. Backend API running on port 8000. Key changes since Round 1: (1) Added POST /api/submit-email endpoint, (2) Scrape endpoint now returns 500 for unsupported sources. Important: the manifest path is data/raw/manifest.yaml (not manifests/manifest.yaml). For ingest tests, use an existing PDF like data/raw/acts/bank_act.pdf or test error handling with a non-existent path. The GET /search endpoint requires query parameter in URL (not body).",
+    "serverMode": "production",
+    "envs": {
+      "API_KEY": "sk-user-gB-F4PRKYCQA22DIMxQX7heaHqjTAW-G-4n_ku-3YXRfZyAjOqSODb7J5xzFn3oAIg_zhdHv-495LERi_SQnu6qj9EVDP7lD3TSlBvW1pEb8l4QzTftsw2tlGZtFrdzfHXg"
+    }
+  },
+  "serverPort": 65254,
+  "proxy": "http://37fde934-800e-480f-ae04-335522fa8e7a:h8zrnGthjHxRSRdVkEfKdeg9Pw03tISa@tun.testsprite.com:8080"
+}

@@ -1,0 +1,205 @@
+version: "2"
+type: backend
+tech_stack:
+  - python
+  - fastapi
+  - next.js
+  - faiss
+  - pydantic
+  - sentence-transformers
+  - streamlit
+  - pdfplumber
+  - pypdf2
+  - tesseract-ocr
+  - adobe-pdf-services
+  - yaml
+features:
+  - name: Document Ingestion Pipeline
+    description: Full Bronze-Silver-Gold pipeline for regulatory PDF ingestion, extraction, segmentation, and enrichment
+    files:
+      - ingestion/pipeline.py
+      - ingestion/schemas.py
+      - ingestion/extract/pdf_extractor.py
+      - ingestion/extract/adobe_pdf_extractor.py
+      - ingestion/extract/bilingual_extractor.py
+      - ingestion/segment/advanced_segmenter.py
+      - ingestion/segment/section_segmenter.py
+      - ingestion/segment/bookmark_segmenter.py
+      - ingestion/classify/document_classifier.py
+      - ingestion/classify/section_classifier.py
+      - ingestion/classify/risk_scorer.py
+      - ingestion/classify/cross_reference.py
+      - ingestion/embed/embedder.py
+      - ingestion/ocr/ocr_processor.py
+      - ingestion/preprocessors/language_filter.py
+    endpoints:
+      - method: POST
+        path: /ingest
+        description: Process a PDF document through the full Bronze-Silver-Gold pipeline
+        auth_required: false
+        request_schema:
+          body:
+            pdf_path: string
+            document_type: string
+            jurisdiction: string
+            is_bilingual: boolean
+        response_schema:
+          "200": "{ document_id, sections_count, status }"
+          "400": "Invalid PDF or missing parameters"
+    depends_on: []
+
+  - name: Batch Document Processing
+    description: Batch ingestion of multiple documents from a YAML manifest with dependency ordering
+    files:
+      - batch_ingest.py
+      - bronze_to_silver.py
+      - gold_builder.py
+      - generate_embeddings.py
+    endpoints:
+      - method: POST
+        path: /batch-ingest
+        description: Process all documents in manifest.yaml through the pipeline
+        auth_required: false
+        request_schema:
+          body:
+            manifest_path: string
+        response_schema:
+          "200": "{ processed_count, failed_count, results[] }"
+          "500": "Pipeline processing error"
+    depends_on:
+      - Document Ingestion Pipeline
+
+  - name: Legislation Discovery & Mapping
+    description: Discover and download Canadian legislation from laws-lois.justice.gc.ca
+    files:
+      - run_mapper.py
+      - run_mapper_from_config.py
+      - ingestion/mapper/justice_client.py
+      - ingestion/mapper/downloader.py
+      - ingestion/mapper/manifest_generator.py
+      - ingestion/mapper/metadata_parser.py
+    endpoints:
+      - method: POST
+        path: /discover
+        description: Discover and download legislation by act name or slug
+        auth_required: false
+        request_schema:
+          body:
+            acts: string[]
+        response_schema:
+          "200": "{ discovered_count, manifest_entries[] }"
+          "404": "Act not found"
+    depends_on: []
+
+  - name: Semantic Search
+    description: FAISS-powered semantic similarity search over Gold layer embeddings
+    files:
+      - search/semantic_search.py
+      - storage/vector_db/faiss_manager.py
+      - ingestion/embed/embedder.py
+      - test_search.py
+    endpoints:
+      - method: GET
+        path: /search
+        description: Search regulatory sections by natural language query
+        auth_required: false
+        request_schema:
+          body:
+            query: string
+            top_k: number
+            category: string
+        response_schema:
+          "200": "{ results[]: { section_id, title, body, score, document } }"
+          "500": "Index not loaded"
+    depends_on:
+      - Document Ingestion Pipeline
+
+  - name: Knowledge Graph Builder
+    description: Build and maintain YAML-based regulatory knowledge graph with nodes and edges
+    files:
+      - build_kg_from_manifest.py
+      - storage/knowledge_graph/nodes.yaml
+      - storage/knowledge_graph/edges.yaml
+      - storage/knowledge_graph/domains.yaml
+      - configs/kg_ontology.yaml
+    endpoints:
+      - method: POST
+        path: /build-kg
+        description: Build knowledge graph from manifest relationships
+        auth_required: false
+        request_schema:
+          body:
+            manifest_path: string
+        response_schema:
+          "200": "{ nodes_count, edges_count }"
+          "500": "KG build error"
+    depends_on:
+      - Document Ingestion Pipeline
+
+  - name: Data Validation
+    description: Validate manifest integrity and Bronze/Silver/Gold schema compliance
+    files:
+      - validate_data.py
+      - validate_manifest.py
+      - fix_manifest_parent_acts.py
+      - restore_manifest.py
+    endpoints:
+      - method: GET
+        path: /validate
+        description: Run validation checks on storage layers and manifest
+        auth_required: false
+        response_schema:
+          "200": "{ valid: boolean, errors[], warnings[] }"
+    depends_on: []
+
+  - name: Email Signup API
+    description: Email submission endpoint with Notion database integration
+    files:
+      - web/src/app/api/submit-email/route.ts
+      - web/src/components/CTAForm.tsx
+    endpoints:
+      - method: POST
+        path: /api/submit-email
+        description: Submit email for waitlist signup, stores in Notion
+        auth_required: false
+        request_schema:
+          body:
+            email: string
+        response_schema:
+          "200": "{ success: true }"
+          "400": "Validation error"
+          "500": "Server error"
+    depends_on: []
+
+  - name: Web Scraping
+    description: Scrape regulatory content from FINTRAC and OPC websites
+    files:
+      - scrape_fintrac.py
+      - scrape_opc.py
+      - convert_html_to_pdf.py
+    endpoints:
+      - method: POST
+        path: /scrape
+        description: Scrape regulatory content from specified source
+        auth_required: false
+        request_schema:
+          body:
+            source: string
+        response_schema:
+          "200": "{ pages_scraped, files_saved[] }"
+          "500": "Scraping error"
+    depends_on: []
+
+known_limitations:
+  - issue: FastAPI routes are empty stubs - no HTTP server is implemented yet
+    location: api/fastapi/routes/__init__.py
+    impact: Backend features are only accessible via CLI scripts, not HTTP endpoints
+  - issue: AI reasoning modules are placeholder stubs
+    location: ai/
+    impact: No LLM-powered reasoning, agents, or evaluation available yet
+  - issue: PostgreSQL integration not implemented
+    location: storage/postgres/
+    impact: All data stored as flat files (JSON, YAML, NumPy) instead of relational DB
+  - issue: No authentication or authorization
+    location: api/
+    impact: All endpoints and scripts are unauthenticated

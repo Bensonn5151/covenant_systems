@@ -379,6 +379,47 @@ guidance:
 
 ---
 
+## Testing with TestSprite
+
+This project uses [TestSprite MCP](https://testsprite.com) for automated AI-driven testing.
+
+### Test Results Summary
+
+| Round | Pass Rate | Tests Passed | Tests Failed | Key Fixes |
+|-------|-----------|-------------|-------------|-----------|
+| Round 1 | 25% | 2/8 | 6/8 | Baseline |
+| Round 2 | 62.5% | 5/8 | 3/8 | +email endpoint, +error codes, +path fixes |
+
+**Bugs Found & Fixed:**
+- Missing email signup endpoint on backend API
+- Incorrect HTTP status codes for scrape error handling
+- Undocumented default manifest paths causing test mismatches
+- Semantic search engine per-request initialization (architectural issue identified)
+
+**Test Coverage:** 8 backend API test cases covering ingestion, batch processing, legislation discovery, semantic search, knowledge graph, data validation, email signup, and web scraping.
+
+All test cases and reports are in [`testsprite_tests/`](./testsprite_tests/).
+
+---
+
+## Project Structure
+
+```
+covenant_systems/
+├── ingestion/              # ETL pipeline (extract, segment, classify, embed)
+├── api/fastapi/            # REST API backend (FastAPI)
+├── search/                 # Semantic search engine (FAISS)
+├── storage/                # Bronze/Silver/Gold data layers + vector DB
+├── dashboard/              # Streamlit analytics UI
+├── web/                    # Next.js frontend
+├── configs/                # Taxonomy, ontology, settings
+├── data/raw/               # Source documents + manifests
+├── testsprite_tests/       # AI-generated test cases (TestSprite MCP)
+└── README.md
+```
+
+---
+
 ## License
 
 Proprietary - Covenant Systems
