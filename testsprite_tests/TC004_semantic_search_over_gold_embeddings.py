@@ -1,46 +1,42 @@
 import requests
+from requests.exceptions import RequestException, Timeout
 
 BASE_URL = "http://localhost:8000"
 TIMEOUT = 30
 
 def test_semantic_search_over_gold_embeddings():
-    # Test successful search with valid query, top_k and category
-    params_success = {
-        "query": "customer due diligence AML requirements",
-        "top_k": 5,
-        "category": "AML"
-    }
     try:
-        response = requests.get(f"{BASE_URL}/search", params=params_success, timeout=TIMEOUT)
-        assert response.status_code == 200, f"Expected status 200 but got {response.status_code}"
-        json_resp = response.json()
-        assert "results" in json_resp, "Response JSON missing 'results' field"
-        results = json_resp["results"]
+        # Normal success case: perform a semantic search with query and top_k parameters
+        params = {"query": "money laundering", "top_k": 2}
+        response = requests.get(f"{BASE_URL}/search", params=params, timeout=TIMEOUT)
+        assert response.status_code == 200, f"Expected 200 but got {response.status_code}"
+        data = response.json()
+        assert "results" in data, "Response JSON missing 'results' key"
+        results = data["results"]
         assert isinstance(results, list), "'results' should be a list"
-        assert len(results) <= params_success["top_k"], f"Returned more results than top_k={params_success['top_k']}"
+        # Assert that top_k results are returned (or fewer but not zero)
+        assert 0 < len(results) <= 2, f"'results' length expected between 1 and 2 but got {len(results)}"
         for item in results:
-            assert all(key in item for key in ("section_id", "title", "body", "score", "document")), \
-                "Each result must have 'section_id', 'title', 'body', 'score', and 'document'"
+            # Validate all required fields in each result
+            for field in ("section_id", "title", "body", "score", "document"):
+                assert field in item, f"Result missing field '{field}'"
+            # Validate types
             assert isinstance(item["section_id"], str), "'section_id' should be a string"
             assert isinstance(item["title"], str), "'title' should be a string"
             assert isinstance(item["body"], str), "'body' should be a string"
-            assert isinstance(item["score"], (float, int)), "'score' should be a float or int"
-            assert 0 <= item["score"] <= 1, "'score' should be between 0 and 1"
+            assert isinstance(item["score"], (float, int)), "'score' should be a number"
+            assert 0.0 <= float(item["score"]) <= 1.0, "'score' should be between 0 and 1"
             assert isinstance(item["document"], str), "'document' should be a string"
-    except requests.RequestException as e:
-        assert False, f"RequestException during successful search test: {e}"
 
-    # Test error case: index not loaded (expect 500)
-    params_error = {
-        "query": "data retention policy",
-        "top_k": 5
-    }
-    try:
-        response = requests.get(f"{BASE_URL}/search", params=params_error, timeout=TIMEOUT)
-        # We expect a 500 error indicating index not loaded
-        assert response.status_code == 500, f"Expected status 500 but got {response.status_code}"
-        # Response body can be checked for error message presence but not mandatory as per PRD
-    except requests.RequestException as e:
-        assert False, f"RequestException during error case test: {e}"
+        # Error case: query expected to trigger 500 when index not loaded
+        # The PRD example indicates that "data retention policy" query causes this
+        params_error = {"query": "data retention policy", "top_k": 5}
+        error_response = requests.get(f"{BASE_URL}/search", params=params_error, timeout=TIMEOUT)
+        assert error_response.status_code == 500, f"Expected 500 for index not loaded but got {error_response.status_code}"
+        error_json = error_response.json()
+        # Response body may be a message or error explanation, not strictly defined but assert presence
+        assert error_json is not None, "Expected JSON response for 500 error"
+    except (RequestException, Timeout) as e:
+        assert False, f"Request failed with exception: {e}"
 
 test_semantic_search_over_gold_embeddings()

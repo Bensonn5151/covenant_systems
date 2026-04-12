@@ -7,7 +7,7 @@
   {
     "id": "TC002",
     "title": "batch_document_processing_from_manifest",
-    "description": "Test the POST /batch-ingest endpoint to process multiple documents defined in a YAML manifest with dependency ordering. Verify that the pipeline runs for each document and returns correct processed_count, failed_count, and per-document results. Also test error handling when manifest contains missing files or causes pipeline errors."
+    "description": "Test the POST /batch-ingest endpoint to process multiple documents defined in a YAML manifest with dependency ordering. Verify that the pipeline runs for each document and returns processed_count, failed_count, and per-document results. Also test error handling when manifest contains missing files or causes pipeline errors."
   },
   {
     "id": "TC003",
@@ -17,7 +17,7 @@
   {
     "id": "TC004",
     "title": "semantic_search_over_gold_embeddings",
-    "description": "Test the GET /search endpoint to perform FAISS-powered semantic similarity search over Gold-layer section embeddings. Verify that queries return top-K relevant sections with section_id, title, body, score, and document fields. Also test error handling when the index is not loaded returning 500 error."
+    "description": "Test the GET /search endpoint to perform FAISS-powered semantic similarity search over Gold-layer section embeddings. Verify that queries return top-K relevant sections with section_id, title, body, score, and document. Also test error handling when the index is not loaded returning 500 error."
   },
   {
     "id": "TC005",
@@ -27,16 +27,16 @@
   {
     "id": "TC006",
     "title": "data_validation_checks",
-    "description": "Test the GET /validate endpoint to run validation checks on manifest integrity and Bronze/Silver/Gold schema compliance. Verify responses indicating valid status with errors and warnings arrays. Also test handling of validation service unavailability returning 500 error."
+    "description": "Test the GET /validate endpoint to run validation checks on manifest integrity and Bronze/Silver/Gold schema compliance. Verify response includes valid boolean, errors array, and warnings array. Also test handling of validation service unavailability returning 500 error."
   },
   {
     "id": "TC007",
     "title": "email_signup_submission",
-    "description": "Test the POST /api/submit-email endpoint to submit emails for waitlist signup. Verify successful submissions return success true. Test validation errors for invalid email formats returning 400 error. Also test server error handling returning 500 error."
+    "description": "Test the POST /api/submit-email endpoint to submit emails for waitlist signup. Verify successful submission returns success true. Test validation error response for invalid email formats and server error handling."
   },
   {
     "id": "TC008",
-    "title": "web_scraping_of_regulatory_content",
-    "description": "Test the POST /scrape endpoint to scrape regulatory content from configured sources like FINTRAC and OPC. Verify successful scraping returns pages_scraped count and list of files_saved. Also test error handling for unsupported sources returning 500 scraping error."
+    "title": "web_scraping_regulatory_content",
+    "description": "Test the POST /scrape endpoint to scrape regulatory content from configured sources like FINTRAC and OPC. Verify successful scraping returns pages_scraped count and list of files_saved. Also test error handling for unsupported sources returning scraping errors."
   }
 ]

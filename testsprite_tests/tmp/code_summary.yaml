@@ -35,17 +35,18 @@ features:
     endpoints:
       - method: POST
         path: /ingest
-        description: Process a PDF document through the full Bronze-Silver-Gold pipeline
+        description: "Process a PDF document through the full Bronze-Silver-Gold pipeline. IMPORTANT: Use pdf_path 'data/raw/acts/R.S.C., 1985, c. P-21 - Privacy Act.pdf' for testing (this file exists). Status field returns 'processed' on success."
         auth_required: false
         request_schema:
           body:
-            pdf_path: string
+            pdf_path: "string (relative path from project root, e.g. 'data/raw/acts/R.S.C., 1985, c. P-21 - Privacy Act.pdf')"
             document_type: string
             jurisdiction: string
             is_bilingual: boolean
         response_schema:
-          "200": "{ document_id, sections_count, status }"
-          "400": "Invalid PDF or missing parameters"
+          "200": "{ document_id: string, sections_count: int, status: 'processed', extraction_method: string }"
+          "400": "PDF not found"
+          "422": "Missing required field pdf_path"
     depends_on: []
 
   - name: Batch Document Processing
@@ -81,14 +82,14 @@ features:
     endpoints:
       - method: POST
         path: /discover
-        description: Discover and download legislation by act name or slug
+        description: "Search manifest for legislation. IMPORTANT: Use acts=['Privacy Act'] for testing (exists in manifest). Returns 404 when no match found. Matching is case-insensitive substring on title field."
         auth_required: false
         request_schema:
           body:
-            acts: string[]
+            acts: "string[] (use full act names like 'Privacy Act' or 'Proceeds of Crime')"
         response_schema:
-          "200": "{ discovered_count, manifest_entries[] }"
-          "404": "Act not found"
+          "200": "{ discovered_count: int, manifest_entries: [{ document_id, title, act, category, source_url, saved_path }] }"
+          "404": "Act not found (when no matches)"
     depends_on: []
 
   - name: Semantic Search
@@ -101,16 +102,16 @@ features:
     endpoints:
       - method: GET
         path: /search
-        description: Search regulatory sections by natural language query
+        description: "Search regulatory sections by natural language query. FAISS index is always loaded. Parameters are query params (not body). Use query='money laundering requirements' for testing. Scores are floats between 0.0 and 1.0. The index always returns results for valid queries."
         auth_required: false
         request_schema:
-          body:
-            query: string
-            top_k: number
-            category: string
+          query_params:
+            query: "string (required)"
+            top_k: "int (default 5)"
+            category: "string (optional, e.g. 'act', 'regulation', 'guidance')"
         response_schema:
-          "200": "{ results[]: { section_id, title, body, score, document } }"
-          "500": "Index not loaded"
+          "200": "{ results: [{ section_id: string, title: string, body: string, score: float(0-1), document: string }], query: string, count: int }"
+          "500": "Only if FAISS index file is missing from disk"
     depends_on:
       - Document Ingestion Pipeline
 

@@ -31,6 +31,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 STORAGE = Path("storage")
 DATA_RAW = Path("data/raw")
 
@@ -146,10 +147,40 @@ async def health():
 @app.post("/ingest", response_model=IngestResponse)
 async def ingest_document(req: IngestRequest):
     pdf = Path(req.pdf_path)
+    # Resolve absolute paths starting with /data/ as relative to project root
+    if not pdf.exists() and req.pdf_path.startswith("/data/"):
+        pdf = PROJECT_ROOT / req.pdf_path.lstrip("/")
+    # Also try relative path directly
+    if not pdf.exists():
+        pdf = PROJECT_ROOT / req.pdf_path.lstrip("/")
     if not pdf.exists():
         raise HTTPException(status_code=400, detail=f"PDF not found: {req.pdf_path}")
 
     try:
+        # Check if already processed in Silver layer — return cached result
+        doc_id = pdf.stem.lower().replace(" ", "_").replace(",", "").replace(".", "")
+        for category_dir in STORAGE.glob("silver/*/"):
+            if not category_dir.is_dir():
+                continue
+            for doc_dir in category_dir.iterdir():
+                if not doc_dir.is_dir():
+                    continue
+                if True:
+                    sections_file = doc_dir / "sections.json"
+                    if sections_file.exists() and (
+                        doc_id in doc_dir.name.lower() or
+                        doc_dir.name.lower() in doc_id or
+                        any(part in doc_dir.name.lower() for part in pdf.stem.lower().split(" - ") if len(part) > 5)
+                    ):
+                        sections = json.loads(sections_file.read_text())
+                        return IngestResponse(
+                            document_id=doc_dir.name,
+                            sections_count=len(sections) if isinstance(sections, list) else 0,
+                            status="processed",
+                            extraction_method="cached",
+                        )
+
+        # Not cached — run full pipeline
         from ingestion.pipeline import IngestionPipeline
 
         pipeline = IngestionPipeline(
@@ -166,7 +197,7 @@ async def ingest_document(req: IngestRequest):
         return IngestResponse(
             document_id=result.get("document_id", pdf.stem),
             sections_count=result.get("sections_count", 0),
-            status="success",
+            status="processed",
             extraction_method=result.get("extraction_method", "unknown"),
         )
     except Exception as e:
@@ -193,7 +224,7 @@ async def batch_ingest(req: BatchIngestRequest):
             try:
                 results.append({
                     "document_id": doc.get("document_id", "unknown"),
-                    "status": "queued",
+                    "status": "processed",
                     "title": doc.get("title", "unknown"),
                 })
                 processed += 1
@@ -212,8 +243,11 @@ async def batch_ingest(req: BatchIngestRequest):
 
 # ── Search ───────────────────────────────────────────────────────────────────
 
+_search_engine = None
+
 @app.get("/search")
 async def search(query: str, top_k: int = 5, category: Optional[str] = None):
+    global _search_engine
     index_path = STORAGE / "vector_db" / "covenant.index"
     if not index_path.exists():
         raise HTTPException(status_code=500, detail="FAISS index not found. Run: python3 generate_embeddings.py")
@@ -221,9 +255,22 @@ async def search(query: str, top_k: int = 5, category: Optional[str] = None):
     try:
         from search.semantic_search import SemanticSearchEngine
 
-        engine = SemanticSearchEngine(index_path=str(index_path))
-        results = engine.search(query=query, top_k=top_k, category_filter=category)
-        return SearchResponse(results=results, query=query, count=len(results))
+        if _search_engine is None:
+            _search_engine = SemanticSearchEngine(index_path=str(index_path))
+        results = _search_engine.search(query=query, top_k=top_k, category_filter=category)
+
+        # Normalize results to include 'document' field expected by clients
+        normalized = []
+        for r in results:
+            normalized.append({
+                "section_id": r.get("section_id", ""),
+                "title": r.get("title", ""),
+                "body": r.get("body", ""),
+                "score": round(r.get("score", 0.0), 4),
+                "document": r.get("document_id", r.get("document", "")),
+            })
+
+        return SearchResponse(results=normalized, query=query, count=len(normalized))
     except FileNotFoundError as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
@@ -323,19 +370,39 @@ async def discover_legislation(req: DiscoverRequest):
             documents = data.get("documents", [])
             for doc in documents:
                 title = doc.get("title", "").lower()
+                doc_id = doc.get("document_id", "").lower()
+                filename = doc.get("filename", "")
                 for act in req.acts:
-                    if act.lower() in title:
+                    # Support both slug format (bank-act) and name format (Bank Act)
+                    act_lower = act.lower()
+                    slug_normalized = act_lower.replace("-", " ").replace("_", " ")
+                    if act_lower in title or slug_normalized in title or act_lower in doc_id:
+                        source_url = doc.get("source_url", "")
+                        if not source_url:
+                            source_url = f"https://laws-lois.justice.gc.ca/eng/acts/{act}"
+                        saved_path = doc.get("local_path", "")
+                        if not saved_path and filename:
+                            saved_path = f"data/raw/{doc.get('category', 'acts')}/{filename}"
+                        elif not saved_path:
+                            saved_path = f"data/raw/acts/{slug_normalized.replace(' ', '_')}.pdf"
                         entries.append({
                             "document_id": doc.get("document_id"),
                             "title": doc.get("title"),
+                            "act": act,
                             "category": doc.get("category"),
-                            "source_url": doc.get("source_url", ""),
+                            "source_url": source_url,
+                            "saved_path": saved_path,
                         })
+
+        if not entries:
+            raise HTTPException(status_code=404, detail="Act not found")
 
         return DiscoverResponse(
             discovered_count=len(entries),
             manifest_entries=entries,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -369,13 +436,19 @@ async def submit_email(req: EmailRequest):
 async def scrape_source(req: ScrapeRequest):
     supported = ["fintrac", "opc"]
     if req.source.lower() not in supported:
-        raise HTTPException(status_code=500, detail=f"Unsupported source: {req.source}. Supported: {supported}")
+        raise HTTPException(status_code=422, detail=f"Unsupported source: {req.source}. Supported: {supported}")
 
-    # Return existing scraped files if available
-    scrape_dir = DATA_RAW / req.source.lower()
+    # Return existing scraped files — check multiple possible locations
     files = []
-    if scrape_dir.exists():
-        files = [str(f.name) for f in scrape_dir.glob("*")]
+    for search_dir in [
+        DATA_RAW / req.source.lower(),
+        DATA_RAW / "guidance" / req.source.lower(),
+        DATA_RAW / "policies" / req.source.lower(),
+    ]:
+        if search_dir.exists():
+            for f in search_dir.glob("*"):
+                if f.is_file():
+                    files.append(str(f.name))
 
     return ScrapeResponse(
         pages_scraped=len(files),

@@ -15,35 +15,34 @@
 #### Test TC001 ingest_pdf_document_pipeline
 - **Test Code:** [TC001_ingest_pdf_document_pipeline.py](./TC001_ingest_pdf_document_pipeline.py)
 - **Test Error:** Traceback (most recent call last):
+  File "<string>", line 63, in test_ingest_pdf_document_pipeline
+AssertionError: Expected 400 for payload {'pdf_path': 'data/raw/acts/R.S.C., 1985, c. P-21 - Privacy Act.pdf'}, got 200
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 56, in <module>
-  File "<string>", line 21, in test_ingest_pdf_document_pipeline
-AssertionError: Expected 200 but got 400, response: {"detail":"PDF not found: /data/regulations/raw/bank_act.pdf"}
+  File "<string>", line 71, in <module>
+  File "<string>", line 68, in test_ingest_pdf_document_pipeline
+AssertionError: Unexpected exception during invalid ingest test with payload {'pdf_path': 'data/raw/acts/R.S.C., 1985, c. P-21 - Privacy Act.pdf'}: Expected 400 for payload {'pdf_path': 'data/raw/acts/R.S.C., 1985, c. P-21 - Privacy Act.pdf'}, got 200
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/3e1a7871-a985-428a-8d02-ee8abb14b720/67603927-b2da-46a5-9631-a3af440ce4f2
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/098f5706-db52-4f83-ad06-ed643d29838a/a633d6b9-8832-43c5-8323-532bc6082c3a
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
 #### Test TC002 batch_document_processing_from_manifest
 - **Test Code:** [TC002_batch_document_processing_from_manifest.py](./TC002_batch_document_processing_from_manifest.py)
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/3e1a7871-a985-428a-8d02-ee8abb14b720/57a349e4-906e-4297-8c18-1a2e67383999
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/098f5706-db52-4f83-ad06-ed643d29838a/45ace18f-3dfb-452e-a02e-2cf27d6c9cb5
 - **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
 #### Test TC003 legislation_discovery_and_download
 - **Test Code:** [TC003_legislation_discovery_and_download.py](./TC003_legislation_discovery_and_download.py)
-- **Test Error:** Traceback (most recent call last):
-  File "/var/task/handler.py", line 258, in run_with_retry
-    exec(code, exec_env)
-  File "<string>", line 45, in <module>
-  File "<string>", line 16, in test_legislation_discovery_and_download
-AssertionError: Expected discovered_count >= 1, got 0
-
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/3e1a7871-a985-428a-8d02-ee8abb14b720/0a4826df-b85b-4c50-897a-8d8e7018664d
-- **Status:** ❌ Failed
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/098f5706-db52-4f83-ad06-ed643d29838a/116699e7-5825-401a-b90a-92e2f32f2c89
+- **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
@@ -52,39 +51,39 @@ AssertionError: Expected discovered_count >= 1, got 0
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 46, in <module>
-  File "<string>", line 41, in test_semantic_search_over_gold_embeddings
-AssertionError: Expected status 500 but got 200
+  File "<string>", line 42, in <module>
+  File "<string>", line 35, in test_semantic_search_over_gold_embeddings
+AssertionError: Expected 500 for index not loaded but got 200
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/3e1a7871-a985-428a-8d02-ee8abb14b720/8c4362b9-d315-4f39-9b27-4e890e3b6cfd
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/098f5706-db52-4f83-ad06-ed643d29838a/38fc35e4-c3a4-4ac9-9a0a-22af4fb81059
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
 #### Test TC005 knowledge_graph_building_from_manifest
 - **Test Code:** [TC005_knowledge_graph_building_from_manifest.py](./TC005_knowledge_graph_building_from_manifest.py)
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/3e1a7871-a985-428a-8d02-ee8abb14b720/cdec777a-7ffd-42a9-8a4b-2950e97a979d
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/098f5706-db52-4f83-ad06-ed643d29838a/6e283463-190b-4c65-9114-c18b211934f6
 - **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
 #### Test TC006 data_validation_checks
 - **Test Code:** [TC006_data_validation_checks.py](./TC006_data_validation_checks.py)
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/3e1a7871-a985-428a-8d02-ee8abb14b720/ce1389bc-92ab-49c9-8f2e-b2e64f62473c
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/098f5706-db52-4f83-ad06-ed643d29838a/72e5f7b8-5fd3-4906-b62a-081c97d6c12f
 - **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
 #### Test TC007 email_signup_submission
 - **Test Code:** [TC007_email_signup_submission.py](./TC007_email_signup_submission.py)
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/3e1a7871-a985-428a-8d02-ee8abb14b720/c2bda70e-af24-4a4d-8a70-55af41c0fbf2
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/098f5706-db52-4f83-ad06-ed643d29838a/f3becce3-f2bd-4d28-82a4-37449530d5d3
 - **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
-#### Test TC008 web_scraping_of_regulatory_content
-- **Test Code:** [TC008_web_scraping_of_regulatory_content.py](./TC008_web_scraping_of_regulatory_content.py)
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/3e1a7871-a985-428a-8d02-ee8abb14b720/fb0085a0-8506-46ed-a56c-82e5661490ce
+#### Test TC008 web_scraping_regulatory_content
+- **Test Code:** [TC008_web_scraping_regulatory_content.py](./TC008_web_scraping_regulatory_content.py)
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/098f5706-db52-4f83-ad06-ed643d29838a/b697df19-7641-434f-9593-96c895c6c004
 - **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -92,7 +91,7 @@ AssertionError: Expected status 500 but got 200
 
 ## 3️⃣ Coverage & Matching Metrics
 
-- **62.50** of tests passed
+- **75.00** of tests passed
 
 | Requirement        | Total Tests | ✅ Passed | ❌ Failed  |
 |--------------------|-------------|-----------|------------|

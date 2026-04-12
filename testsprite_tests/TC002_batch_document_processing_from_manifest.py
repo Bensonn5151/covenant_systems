@@ -1,57 +1,49 @@
 import requests
-import json
 
 BASE_URL = "http://localhost:8000"
 TIMEOUT = 30
 
-
 def test_batch_document_processing_from_manifest():
+    url = f"{BASE_URL}/batch-ingest"
     headers = {"Content-Type": "application/json"}
 
-    # Test with a valid manifest path that exists and includes real PDFs
-    valid_manifest_path = "data/raw/manifest.yaml"
-    valid_payload = {"manifest_path": valid_manifest_path}
+    # Test successful batch ingest with a valid manifest
+    valid_payload = {
+        "manifest_path": "data/raw/manifest.yaml"
+    }
 
-    try:
-        # POST /batch-ingest with valid manifest
-        response = requests.post(f"{BASE_URL}/batch-ingest", headers=headers, json=valid_payload, timeout=TIMEOUT)
-    except requests.RequestException as e:
-        assert False, f"Request to /batch-ingest with valid manifest failed: {e}"
-
+    response = requests.post(url, json=valid_payload, headers=headers, timeout=TIMEOUT)
     assert response.status_code == 200, f"Expected 200 OK but got {response.status_code}"
-    try:
-        data = response.json()
-    except json.JSONDecodeError:
-        assert False, "Response is not valid JSON"
+    data = response.json()
 
-    assert "processed_count" in data and isinstance(data["processed_count"], int), "Missing or invalid processed_count"
-    assert "failed_count" in data and isinstance(data["failed_count"], int), "Missing or invalid failed_count"
-    assert "results" in data and isinstance(data["results"], list), "Missing or invalid results list"
+    assert "processed_count" in data, "Response missing processed_count"
+    assert "failed_count" in data, "Response missing failed_count"
+    assert "results" in data and isinstance(data["results"], list), "Response missing or invalid results list"
 
-    # Each result should have document_id and status keys, status should be 'processed', 'failed' or 'queued'
-    for doc_result in data["results"]:
-        assert "document_id" in doc_result and isinstance(doc_result["document_id"], str), "Missing or invalid document_id in result"
-        assert "status" in doc_result and doc_result["status"] in {"processed", "failed", "queued"}, f"Invalid status value: {doc_result.get('status')}"
+    # Validate processed_count and failed_count sensible according to result entries
+    processed_count = data["processed_count"]
+    failed_count = data["failed_count"]
+    results = data["results"]
 
-    # Test error handling with a manifest that contains missing files or causes pipeline errors
-    error_manifest_path = "data/raw/manifest_with_missing_file.yaml"
-    error_payload = {"manifest_path": error_manifest_path}
+    assert processed_count >= 0, "processed_count should be non-negative"
+    assert failed_count >= 0, "failed_count should be non-negative"
+    assert processed_count + failed_count == len(results), "Sum of processed_count and failed_count must equal results length"
 
-    try:
-        error_response = requests.post(f"{BASE_URL}/batch-ingest", headers=headers, json=error_payload, timeout=TIMEOUT)
-    except requests.RequestException as e:
-        assert False, f"Request to /batch-ingest with error manifest failed: {e}"
+    for result in results:
+        assert "document_id" in result, "Result missing document_id"
+        assert "status" in result, "Result missing status"
+        assert result["status"] == "processed", f"Each document status expected to be 'processed', got {result['status']}"
+        assert "title" in result, "Result missing title"
 
-    # Expect a 400 error due to invalid PDF or missing parameters as per PRD user flow
-    assert error_response.status_code == 400, f"Expected 400 Invalid PDF or missing parameters but got {error_response.status_code}"
+    # Test error handling with manifest that contains missing files or causes pipeline errors
+    # According to PRD, bad manifest returns 400 or 500 (pipeline processing error)
+    # Testing with a known corrupt manifest path
+    bad_payload = {
+        "manifest_path": "data/raw/manifest_with_missing_file.yaml"
+    }
 
-    # Optionally verify error message in response body
-    try:
-        error_data = error_response.json()
-        # The specification doesn't detail error response body, so no strict assertion here
-    except json.JSONDecodeError:
-        # It's acceptable if no JSON content on error
-        pass
-
+    response_bad = requests.post(url, json=bad_payload, headers=headers, timeout=TIMEOUT)
+    # The PRD mentions 500 Pipeline processing error for missing files in manifest, test accordingly
+    assert response_bad.status_code in (400, 500), f"Expected 400 or 500 error but got {response_bad.status_code}"
 
 test_batch_document_processing_from_manifest()
