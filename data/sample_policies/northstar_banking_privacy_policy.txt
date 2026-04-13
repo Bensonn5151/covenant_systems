@@ -1,0 +1,37 @@
+NORTHSTAR BANKING CORP
+PRIVACY POLICY
+Version 2.1 | Effective September 1, 2024
+
+1. PURPOSE AND SCOPE
+
+NorthStar Banking Corp is committed to protecting the privacy of its customers and employees. This policy describes how we collect, use, disclose, and protect personal information in the course of providing our banking and financial services. This policy applies to all personal information collected by NorthStar Banking Corp and its subsidiaries operating in Canada. We comply with the Personal Information Protection and Electronic Documents Act (PIPEDA) and applicable provincial privacy legislation.
+
+2. CONSENT
+
+NorthStar Banking Corp obtains the knowledge and consent of individuals for the collection, use, or disclosure of personal information, except where inappropriate as permitted by law. We provide clear and understandable notice about why personal information is being collected and how it will be used. The form of consent sought may vary depending on the circumstances and the sensitivity of the information.
+
+Express consent is obtained when we collect sensitive financial information such as credit reports, income details, and tax information. Implied consent may be relied upon for less sensitive information or where the purpose would be obvious to a reasonable person. An individual may withdraw consent at any time by contacting our Privacy Office, subject to legal or contractual restrictions.
+
+3. COLLECTION OF PERSONAL INFORMATION
+
+We collect personal information that is necessary for the purposes of providing our banking services. This includes identity verification, credit assessment, account management, fraud prevention, and regulatory compliance. Information is collected directly from customers through applications, account opening forms, telephone conversations, and ongoing transactions.
+
+NorthStar Banking Corp limits the collection of personal information to what is necessary for identified purposes. We do not collect personal information indiscriminately and we use fair and lawful means to collect information.
+
+4. USE AND DISCLOSURE
+
+Personal information is used only for the purposes for which it was collected, unless we receive further consent or are required or permitted by law to use it for another purpose. We may disclose personal information to regulatory bodies including FINTRAC, OSFI, and law enforcement agencies as required by law. NorthStar Banking Corp does not sell personal information to third parties for marketing purposes.
+
+We may share personal information with service providers who assist us in operating our business, such as data processors, auditors, and technology vendors. These service providers are contractually required to protect the information and use it only for the purposes specified by NorthStar.
+
+5. SECURITY
+
+NorthStar Banking Corp employs industry-standard security measures to protect personal information from unauthorized access, disclosure, alteration, or destruction. Our security program includes encryption of data in transit and at rest, multi-factor authentication for customer accounts, role-based access controls for employees, intrusion detection and monitoring systems, and regular security assessments and penetration testing. Our information security program is reviewed annually and updated as necessary.
+
+6. ACCESS REQUESTS
+
+Customers may request access to their personal information held by NorthStar Banking Corp by contacting our Privacy Office in writing. We will respond to access requests within 30 days of receipt. There is no fee for reasonable access requests. Individuals have the right to challenge the accuracy and completeness of their personal information and request corrections where appropriate. If we refuse an access request, we will provide written reasons for the refusal.
+
+7. CHANGES TO THIS POLICY
+
+NorthStar Banking Corp reserves the right to update this privacy policy at any time. Material changes will be communicated to customers through our website, online banking notifications, and branch notices. The effective date at the top of this policy indicates when it was last revised.

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional, List
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -454,3 +454,401 @@ async def scrape_source(req: ScrapeRequest):
         pages_scraped=len(files),
         files_saved=files,
     )
+
+
+# ── Dashboard Endpoints ──────────────────────────────────────────────────────
+
+# ── Comparison Endpoints ─────────────────────────────────────────────────────
+
+SAMPLE_POLICIES = Path("data/sample_policies")
+
+@app.get("/api/sample-policies")
+async def list_sample_policies():
+    from api.fastapi.compare import parse_text_to_sections
+    policies = []
+    for f in sorted(SAMPLE_POLICIES.glob("*.txt")):
+        try:
+            text = f.read_text()
+            sections = parse_text_to_sections(text)
+            # Extract company name from first line
+            first_line = text.strip().split("\n")[0].strip()
+            policies.append({
+                "id": f.stem,
+                "name": first_line,
+                "filename": f.name,
+                "sections_count": len(sections),
+            })
+        except Exception:
+            continue
+    return {"policies": policies}
+
+
+@app.get("/api/sample-policies/{policy_id}")
+async def get_sample_policy(policy_id: str):
+    from api.fastapi.compare import parse_text_to_sections
+    path = SAMPLE_POLICIES / f"{policy_id}.txt"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Sample policy not found: {policy_id}")
+    text = path.read_text()
+    sections = parse_text_to_sections(text)
+    first_line = text.strip().split("\n")[0].strip()
+    return {
+        "policy_name": first_line,
+        "filename": path.name,
+        "sections": sections,
+        "raw_text": text,
+    }
+
+
+@app.get("/api/regulations")
+async def list_regulations():
+    regs = []
+    for sections_file in STORAGE.glob("gold/*/sections.json"):
+        doc_id = sections_file.parent.name
+        sections = json.loads(sections_file.read_text())
+        if not isinstance(sections, list):
+            continue
+        first = sections[0] if sections else {}
+        meta = first.get("metadata", {}) if isinstance(first.get("metadata"), dict) else {}
+        obligations = sum(1 for s in sections
+                        if isinstance(s.get("classification"), dict) and
+                        s["classification"].get("label") in ("obligation", "prohibition"))
+        regs.append({
+            "id": doc_id,
+            "document_type": meta.get("document_type", ""),
+            "jurisdiction": meta.get("jurisdiction", ""),
+            "category": meta.get("category", ""),
+            "total_sections": len(sections),
+            "obligations_count": obligations,
+        })
+    regs.sort(key=lambda r: r["obligations_count"], reverse=True)
+    return {"regulations": regs}
+
+
+class CompareRequest(BaseModel):
+    policy_sections: Optional[list] = None
+    policy_text: Optional[str] = None
+    sample_policy_id: Optional[str] = None
+    regulation_id: str = "pipeda"
+    threshold: float = 0.5
+
+
+@app.post("/api/compare")
+async def compare_policy(req: CompareRequest):
+    try:
+        from api.fastapi.compare import compare_policy_to_regulation, parse_text_to_sections
+
+        # Resolve policy sections from one of three sources
+        if req.sample_policy_id:
+            path = SAMPLE_POLICIES / f"{req.sample_policy_id}.txt"
+            if not path.exists():
+                raise HTTPException(status_code=404, detail=f"Sample policy not found: {req.sample_policy_id}")
+            sections = parse_text_to_sections(path.read_text())
+        elif req.policy_text:
+            sections = parse_text_to_sections(req.policy_text)
+        elif req.policy_sections:
+            sections = req.policy_sections
+        else:
+            raise HTTPException(status_code=400, detail="Provide policy_sections, policy_text, or sample_policy_id")
+
+        if not sections:
+            raise HTTPException(status_code=400, detail="No sections found in policy document")
+
+        result = compare_policy_to_regulation(
+            policy_sections=sections,
+            regulation_id=req.regulation_id,
+            threshold=req.threshold,
+        )
+        return result
+    except HTTPException:
+        raise
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/compare-upload")
+async def compare_uploaded_file(file: UploadFile = File(...), regulation_id: str = "pipeda", threshold: float = 0.5):
+    """Upload a PDF or TXT file and compare against a regulation."""
+    from api.fastapi.compare import compare_policy_to_regulation, parse_text_to_sections
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    content = await file.read()
+    ext = file.filename.lower().rsplit(".", 1)[-1] if "." in file.filename else ""
+
+    if ext == "txt":
+        text = content.decode("utf-8", errors="ignore")
+        sections = parse_text_to_sections(text)
+    elif ext == "pdf":
+        # Extract text from PDF using PyPDF2
+        try:
+            import io
+            from PyPDF2 import PdfReader
+            reader = PdfReader(io.BytesIO(content))
+            pages = [page.extract_text() or "" for page in reader.pages]
+            text = "\n".join(pages)
+            sections = parse_text_to_sections(text)
+            # If section parsing finds nothing, split by paragraphs
+            if not sections:
+                paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) > 50]
+                sections = [{"section_id": f"policy-s{i+1:03d}", "title": p[:60], "body": p} for i, p in enumerate(paragraphs)]
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to parse PDF: {e}")
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}. Use .pdf or .txt")
+
+    if not sections:
+        raise HTTPException(status_code=400, detail="No sections could be extracted from the file")
+
+    result = compare_policy_to_regulation(
+        policy_sections=sections,
+        regulation_id=regulation_id,
+        threshold=threshold,
+    )
+    result["filename"] = file.filename
+    result["sections_extracted"] = len(sections)
+    return result
+
+
+# ── Dashboard Endpoints ──────────────────────────────────────────────────────
+
+def _load_all_gold_sections() -> list:
+    """Load all Gold layer sections from storage."""
+    all_sections = []
+    for sections_file in STORAGE.glob("gold/*/sections.json"):
+        try:
+            sections = json.loads(sections_file.read_text())
+            if isinstance(sections, list):
+                all_sections.extend(sections)
+        except Exception:
+            continue
+    return all_sections
+
+
+@app.get("/api/dashboard/stats")
+async def dashboard_stats():
+    sections = _load_all_gold_sections()
+    total = len(sections)
+
+    # Classification counts
+    classifications = {"obligation": 0, "prohibition": 0, "permission": 0, "definition": 0, "procedural": 0}
+    risk_levels = {"low": 0, "medium": 0, "high": 0, "critical": 0}
+    operational_areas: dict = {}
+    high_risk_items = []
+
+    # Per-document stats
+    doc_stats: dict = {}
+
+    for s in sections:
+        # Classification
+        cls = s.get("classification", {})
+        label = cls.get("label", "procedural") if isinstance(cls, dict) else "procedural"
+        if label in classifications:
+            classifications[label] += 1
+
+        # Risk
+        risk = s.get("risk", {})
+        level = risk.get("risk_level", "low") if isinstance(risk, dict) else "low"
+        if level in risk_levels:
+            risk_levels[level] += 1
+
+        # Operational areas
+        areas = risk.get("operational_areas", []) if isinstance(risk, dict) else []
+        for area in areas:
+            operational_areas[area] = operational_areas.get(area, 0) + 1
+
+        # High risk items
+        if level in ("high", "critical"):
+            high_risk_items.append({
+                "section_id": s.get("section_id", ""),
+                "title": s.get("title", ""),
+                "body": s.get("body", "")[:200],
+                "document": s.get("metadata", {}).get("document_id", "") if isinstance(s.get("metadata"), dict) else "",
+                "risk_level": level,
+                "classification": label,
+                "operational_areas": areas,
+            })
+
+        # Per-document
+        doc_id = s.get("metadata", {}).get("document_id", "unknown") if isinstance(s.get("metadata"), dict) else "unknown"
+        if doc_id not in doc_stats:
+            doc_stats[doc_id] = {
+                "document_id": doc_id,
+                "document_type": s.get("metadata", {}).get("document_type", "") if isinstance(s.get("metadata"), dict) else "",
+                "jurisdiction": s.get("metadata", {}).get("jurisdiction", "") if isinstance(s.get("metadata"), dict) else "",
+                "category": s.get("metadata", {}).get("category", "") if isinstance(s.get("metadata"), dict) else "",
+                "section_count": 0,
+                "risk_breakdown": {"low": 0, "medium": 0, "high": 0, "critical": 0},
+                "classification_breakdown": {"obligation": 0, "prohibition": 0, "permission": 0, "definition": 0, "procedural": 0},
+            }
+        doc_stats[doc_id]["section_count"] += 1
+        if level in doc_stats[doc_id]["risk_breakdown"]:
+            doc_stats[doc_id]["risk_breakdown"][level] += 1
+        if label in doc_stats[doc_id]["classification_breakdown"]:
+            doc_stats[doc_id]["classification_breakdown"][label] += 1
+
+    # Health score: (1 - high_risk / total) * 100
+    high_count = risk_levels.get("high", 0) + risk_levels.get("critical", 0)
+    health_score = round(((total - high_count) / total) * 100, 1) if total > 0 else 0
+
+    # Sort high risk items by confidence descending, limit to 20
+    high_risk_items.sort(key=lambda x: x.get("risk_level", ""), reverse=True)
+    high_risk_items = high_risk_items[:20]
+
+    return {
+        "total_sections": total,
+        "total_documents": len(doc_stats),
+        "classifications": classifications,
+        "risk_levels": risk_levels,
+        "operational_areas": operational_areas,
+        "compliance_health_score": health_score,
+        "high_risk_sections": high_risk_items,
+        "documents": list(doc_stats.values()),
+    }
+
+
+@app.get("/api/dashboard/documents")
+async def dashboard_documents():
+    documents = []
+    for sections_file in STORAGE.glob("gold/*/sections.json"):
+        doc_id = sections_file.parent.name
+        try:
+            sections = json.loads(sections_file.read_text())
+            if not isinstance(sections, list):
+                continue
+
+            first = sections[0] if sections else {}
+            meta = first.get("metadata", {}) if isinstance(first.get("metadata"), dict) else {}
+
+            risk_breakdown = {"low": 0, "medium": 0, "high": 0, "critical": 0}
+            classification_breakdown = {"obligation": 0, "prohibition": 0, "permission": 0, "definition": 0, "procedural": 0}
+
+            for s in sections:
+                risk = s.get("risk", {})
+                level = risk.get("risk_level", "low") if isinstance(risk, dict) else "low"
+                if level in risk_breakdown:
+                    risk_breakdown[level] += 1
+
+                cls = s.get("classification", {})
+                label = cls.get("label", "procedural") if isinstance(cls, dict) else "procedural"
+                if label in classification_breakdown:
+                    classification_breakdown[label] += 1
+
+            documents.append({
+                "document_id": doc_id,
+                "document_type": meta.get("document_type", ""),
+                "jurisdiction": meta.get("jurisdiction", ""),
+                "category": meta.get("category", ""),
+                "section_count": len(sections),
+                "risk_breakdown": risk_breakdown,
+                "classification_breakdown": classification_breakdown,
+                "processed_date": meta.get("processed_date", ""),
+            })
+        except Exception:
+            continue
+
+    documents.sort(key=lambda d: d["section_count"], reverse=True)
+    return {"documents": documents, "total": len(documents)}
+
+
+@app.get("/api/dashboard/documents/{document_id}")
+async def dashboard_document_detail(document_id: str):
+    sections_file = STORAGE / "gold" / document_id / "sections.json"
+    if not sections_file.exists():
+        raise HTTPException(status_code=404, detail=f"Document not found: {document_id}")
+
+    try:
+        sections = json.loads(sections_file.read_text())
+        if not isinstance(sections, list):
+            sections = []
+
+        normalized = []
+        for s in sections:
+            cls = s.get("classification", {})
+            risk = s.get("risk", {})
+            meta = s.get("metadata", {}) if isinstance(s.get("metadata"), dict) else {}
+            normalized.append({
+                "section_id": s.get("section_id", ""),
+                "section_number": s.get("section_number", ""),
+                "title": s.get("title", ""),
+                "body": s.get("body", ""),
+                "level": s.get("level", 0),
+                "classification": cls.get("label", "procedural") if isinstance(cls, dict) else "procedural",
+                "classification_confidence": cls.get("confidence", 0) if isinstance(cls, dict) else 0,
+                "risk_level": risk.get("risk_level", "low") if isinstance(risk, dict) else "low",
+                "operational_areas": risk.get("operational_areas", []) if isinstance(risk, dict) else [],
+                "document_type": meta.get("document_type", ""),
+                "jurisdiction": meta.get("jurisdiction", ""),
+                "category": meta.get("category", ""),
+            })
+
+        return {
+            "document_id": document_id,
+            "sections": normalized,
+            "total_sections": len(normalized),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/knowledge-graph")
+async def knowledge_graph():
+    import yaml
+
+    nodes_path = STORAGE / "knowledge_graph" / "nodes.yaml"
+    edges_path = STORAGE / "knowledge_graph" / "edges.yaml"
+    domains_path = STORAGE / "knowledge_graph" / "domains.yaml"
+
+    nodes = []
+    edges = []
+    domain_stats: dict = {}
+
+    if nodes_path.exists():
+        with open(nodes_path) as f:
+            data = yaml.safe_load(f) or {}
+        raw_nodes = data.get("nodes", [])
+        for n in raw_nodes:
+            node = {
+                "id": n.get("id", ""),
+                "type": n.get("type", ""),
+                "source_document": n.get("source_document", ""),
+                "section_number": n.get("section_number", ""),
+                "text": n.get("text", "")[:200],
+                "domains": n.get("domains", []),
+                "risk_level": n.get("risk_level", ""),
+            }
+            nodes.append(node)
+            for d in node["domains"]:
+                domain_stats[d] = domain_stats.get(d, 0) + 1
+
+    if edges_path.exists():
+        with open(edges_path) as f:
+            data = yaml.safe_load(f) or {}
+        raw_edges = data.get("edges", [])
+        for e in raw_edges:
+            edges.append({
+                "from": e.get("from", ""),
+                "to": e.get("to", ""),
+                "type": e.get("type", ""),
+                "description": e.get("description", ""),
+                "confidence": e.get("confidence", 0),
+            })
+
+    domains_data = {}
+    if domains_path.exists():
+        with open(domains_path) as f:
+            domains_data = yaml.safe_load(f) or {}
+
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "stats": {
+            "nodes_count": len(nodes),
+            "edges_count": len(edges),
+            "domains": domain_stats,
+        },
+        "domains_config": domains_data,
+    }

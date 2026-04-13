@@ -19,7 +19,7 @@ export default function Home() {
         </div>
 
         <h1 className="text-4xl md:text-6xl font-bold tracking-tighter text-white mb-6 max-w-4xl mx-auto">
-          CovenantAI: The <span className="text-green-500">Operating System</span> for Regulation.
+          Covenant Systems: The <span className="text-green-500">Operating System</span> for Regulation.
         </h1>
 
         <p className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
@@ -70,7 +70,7 @@ export default function Home() {
               Built for Regulatory Complexity
             </h2>
             <p className="text-gray-400 leading-relaxed text-lg">
-              We've moved beyond keyword search and AI wrappers. CovenantAI uses <span className="text-green-400 font-semibold">GraphRAG architecture</span>—combining Knowledge Graphs with LLMs to understand regulatory relationships, trace compliance impacts across jurisdictions, and surface hidden dependencies that traditional systems miss.
+              We've moved beyond keyword search and AI wrappers. Covenant Systems uses <span className="text-green-400 font-semibold">GraphRAG architecture</span>—combining Knowledge Graphs with LLMs to understand regulatory relationships, trace compliance impacts across jurisdictions, and surface hidden dependencies that traditional systems miss.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6">
               <div className="flex flex-col gap-1 p-3 bg-gray-900/50 border border-gray-800 rounded">

@@ -10,7 +10,7 @@ export default function Terminal() {
       <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
         <div className="flex items-center gap-2">
           <TerminalIcon className="w-4 h-4 text-gray-500" />
-          <span className="text-xs text-gray-500">covenant_ai_core — -zsh — 80x24</span>
+          <span className="text-xs text-gray-500">covenant_systems — -zsh — 80x24</span>
         </div>
         <div className="flex gap-1.5">
           <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50" />
@@ -23,15 +23,15 @@ export default function Terminal() {
       <div className="p-6 min-h-[200px] text-green-500">
         <TypeAnimation
           sequence={[
-            '> CovenantAI initializing...',
+            '> Covenant Systems initializing...',
             1000,
-            '> CovenantAI initializing...\n> Connecting to Global Regulatory Feeds... [ONLINE]',
+            '> Covenant Systems initializing...\n> Connecting to Global Regulatory Feeds... [ONLINE]',
             800,
-            '> CovenantAI initializing...\n> Connecting to Global Regulatory Feeds... [ONLINE]\n> Verifying Data Integrity Checksum... [PASSED]',
+            '> Covenant Systems initializing...\n> Connecting to Global Regulatory Feeds... [ONLINE]\n> Verifying Data Integrity Checksum... [PASSED]',
             800,
-            '> CovenantAI initializing...\n> Connecting to Global Regulatory Feeds... [ONLINE]\n> Verifying Data Integrity Checksum... [PASSED]\n> Mapping Logic v3.0 Loaded... [OK]',
+            '> Covenant Systems initializing...\n> Connecting to Global Regulatory Feeds... [ONLINE]\n> Verifying Data Integrity Checksum... [PASSED]\n> Mapping Logic v3.0 Loaded... [OK]',
             800,
-            '> CovenantAI initializing...\n> Connecting to Global Regulatory Feeds... [ONLINE]\n> Verifying Data Integrity Checksum... [PASSED]\n> Mapping Logic v3.0 Loaded... [OK]\n> SYSTEM: READY FOR ORCHESTRATION',
+            '> Covenant Systems initializing...\n> Connecting to Global Regulatory Feeds... [ONLINE]\n> Verifying Data Integrity Checksum... [PASSED]\n> Mapping Logic v3.0 Loaded... [OK]\n> SYSTEM: READY FOR ORCHESTRATION',
             1000
           ]}
           wrapper="span"

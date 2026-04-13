@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CovenantAI: The Operating System for Regulation",
+  title: "Covenant Systems: The Operating System for Regulation",
   description: "Turn static regulatory noise into dynamic, auditable action.",
 };
 
