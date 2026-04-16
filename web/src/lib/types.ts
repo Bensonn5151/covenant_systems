@@ -176,3 +176,32 @@ export interface ComparisonResult {
   coverage_by_area: Record<string, CoverageByArea>;
   threshold: number;
 }
+
+// ── Multi-Regulation Heatmap Types ──────────────────────────────────────────
+
+export interface HeatmapCell {
+  worst_risk: RiskLevel | null;
+  coverage_pct: number;
+  gap_count: number;
+  obligation_count: number;
+}
+
+export interface RegulationSummary {
+  score: number;
+  overall_coverage: number;
+  total_obligations: number;
+  covered: number;
+  gaps: number;
+  partial: number;
+  orphan_gaps?: number;  // gaps with no operational_area tagged
+}
+
+export interface MultiComparisonResult {
+  policy_id: string;
+  evaluated_at: string;
+  regulations: string[];
+  operational_areas: string[];
+  heatmap: Record<string, Record<string, HeatmapCell>>;
+  summary: Record<string, RegulationSummary>;
+  details: Record<string, ComparisonResult>;
+}

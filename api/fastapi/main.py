@@ -18,6 +18,10 @@ from pydantic import BaseModel
 # Ensure project root is on path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+# Load .env for GROQ_API_KEY etc.
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
+
 app = FastAPI(
     title="Covenant Systems API",
     description="AI Regulatory Compliance Platform - Bronze/Silver/Gold Pipeline",
@@ -634,6 +638,232 @@ async def compare_uploaded_file(file: UploadFile = File(...), regulation_id: str
         regulation_id=regulation_id,
         threshold=threshold,
     )
+    result["filename"] = file.filename
+    result["sections_extracted"] = len(sections)
+    return result
+
+
+# ── Multi-Regulation Comparison (heatmap) ────────────────────────────────────
+
+# Canonical ordering for regulation columns in the heatmap
+_REGULATION_ORDER = [
+    "pipeda",
+    "privacy_act",
+    "sor_2018_64_breach_of_security_safeguards_regulations",
+    "sor_2001_7_pipeda_regulations",
+    "opc__guidelines_for_obtaining_meaningful_consent",
+    "opc__breach_of_security_safeguards_reporting",
+    "opc__inappropriate_data_practices",
+    "opc__privacy_and_ai",
+    "opc__ten_fair_information_principles",
+]
+
+_OPERATIONAL_AREAS = [
+    "data_collection", "consent", "data_use", "data_disclosure",
+    "data_retention", "breach_notification", "access_rights", "accountability",
+]
+
+_RISK_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
+
+def _resolve_policy_sections(
+    sample_policy_id: str | None,
+    policy_text: str | None,
+    policy_sections: list | None,
+) -> tuple[list, str]:
+    """Resolve policy sections from one of three sources. Returns (sections, policy_id)."""
+    from api.fastapi.compare import parse_text_to_sections
+
+    if sample_policy_id:
+        path = SAMPLE_POLICIES / f"{sample_policy_id}.txt"
+        if not path.exists():
+            raise HTTPException(status_code=404, detail=f"Sample policy not found: {sample_policy_id}")
+        return parse_text_to_sections(path.read_text()), sample_policy_id
+    elif policy_text:
+        return parse_text_to_sections(policy_text), "uploaded_policy"
+    elif policy_sections:
+        return policy_sections, "uploaded_policy"
+    else:
+        raise HTTPException(status_code=400, detail="Provide policy_sections, policy_text, or sample_policy_id")
+
+
+def _extract_sections_from_bytes(content: bytes, filename: str) -> list:
+    """Extract policy sections from file bytes (PDF or TXT)."""
+    from api.fastapi.compare import parse_text_to_sections
+
+    ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+    if ext == "txt":
+        return parse_text_to_sections(content.decode("utf-8", errors="ignore"))
+    elif ext == "pdf":
+        import io
+        from PyPDF2 import PdfReader
+        reader = PdfReader(io.BytesIO(content))
+        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+        sections = parse_text_to_sections(text)
+        if not sections:
+            paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) > 50]
+            sections = [{"section_id": f"policy-s{i+1:03d}", "title": p[:60], "body": p} for i, p in enumerate(paragraphs)]
+        return sections
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}. Use .pdf or .txt")
+
+
+def _build_multi_comparison(policy_sections: list, policy_id: str, threshold: float) -> dict:
+    """Run policy against all regulations and build heatmap response.
+
+    Uses Groq LLM for direct reasoning (no embeddings). Falls back to
+    embedding-based comparison if GROQ_API_KEY is not set.
+    """
+    # Discover available regulations
+    available_regs = {f.parent.name for f in STORAGE.glob("gold/*/sections.json")}
+    regulations = [r for r in _REGULATION_ORDER if r in available_regs]
+    for r in sorted(available_regs):
+        if r not in regulations:
+            regulations.append(r)
+
+    use_llm = bool(os.environ.get("GROQ_API_KEY"))
+
+    details = {}
+    if use_llm:
+        from api.fastapi.llm_compare import llm_compare_policy_to_regulation
+        print(f"\n  Using Groq LLM for {len(regulations)} regulations...")
+        for reg_id in regulations:
+            print(f"  Comparing against {reg_id}...")
+            details[reg_id] = llm_compare_policy_to_regulation(
+                policy_sections=policy_sections,
+                regulation_id=reg_id,
+                policy_id=policy_id,
+            )
+    else:
+        from api.fastapi.compare import compare_policy_to_regulation
+        from ingestion.embed.embedder import get_embedder
+        embedder = get_embedder()
+        policy_texts = [s.get("body", s.get("title", "")) for s in policy_sections]
+        policy_embeddings = embedder.embed_texts(policy_texts)
+        for reg_id in regulations:
+            details[reg_id] = compare_policy_to_regulation(
+                policy_sections=policy_sections,
+                regulation_id=reg_id,
+                threshold=threshold,
+                policy_id=policy_id,
+                embedder=embedder,
+                policy_embeddings=policy_embeddings,
+            )
+
+    # Build heatmap grid
+    heatmap: dict = {}
+    summary: dict = {}
+    for reg_id, result in details.items():
+        heatmap[reg_id] = {}
+        summary[reg_id] = {
+            "score": result.get("score", 0),
+            "overall_coverage": result.get("overall_coverage", 0),
+            "total_obligations": result.get("total_obligations", 0),
+            "covered": result.get("covered", 0),
+            "gaps": result.get("gaps", 0),
+            "partial": result.get("partial", 0),
+        }
+
+        # Separate uncovered (gaps + partial) from covered (matches).
+        # Heatmap color = worst risk of UNCOVERED items only.
+        # If everything is covered, the cell is green — risk is mitigated.
+        gap_entries = result.get("gap_details", []) + result.get("partial_details", [])
+        match_entries = result.get("matches", [])
+
+        # Count orphan gaps (no operational_areas tagged) so they appear
+        # in the summary row even though they can't map to a specific cell.
+        orphan_gaps = sum(
+            1 for e in result.get("gap_details", [])
+            if not (e.get("operational_areas") or [])
+        )
+        summary[reg_id]["orphan_gaps"] = orphan_gaps
+
+        for area in _OPERATIONAL_AREAS:
+            # Gaps/partial in this area — these drive the cell color
+            area_gaps = [e for e in gap_entries if area in (e.get("operational_areas") or [])]
+            # Matches in this area — count toward obligation_count but NOT color
+            area_matches = [e for e in match_entries if area in (e.get("operational_areas") or [])]
+            cba = result.get("coverage_by_area", {}).get(area, {})
+            obligation_count = cba.get("total", len(area_gaps) + len(area_matches))
+            gap_count = sum(
+                1 for e in gap_entries
+                if area in (e.get("operational_areas") or [])
+            )
+
+            if obligation_count == 0:
+                # No obligations in this area for this regulation
+                heatmap[reg_id][area] = {
+                    "worst_risk": None,
+                    "coverage_pct": 0,
+                    "gap_count": 0,
+                    "obligation_count": 0,
+                }
+            elif not area_gaps:
+                # All obligations in this area are covered — green
+                heatmap[reg_id][area] = {
+                    "worst_risk": "low",
+                    "coverage_pct": cba.get("percentage", 100),
+                    "gap_count": 0,
+                    "obligation_count": obligation_count,
+                }
+            else:
+                # There are uncovered obligations — color by worst gap risk
+                gap_risks = [e.get("residual_risk", "medium") for e in area_gaps]
+                worst = min(gap_risks, key=lambda r: _RISK_RANK.get(r, 3))
+                heatmap[reg_id][area] = {
+                    "worst_risk": worst,
+                    "coverage_pct": cba.get("percentage", 0),
+                    "gap_count": gap_count,
+                    "obligation_count": obligation_count,
+                }
+
+    evaluated_at = datetime.utcnow().isoformat() + "Z"
+    return {
+        "policy_id": policy_id,
+        "evaluated_at": evaluated_at,
+        "regulations": regulations,
+        "operational_areas": _OPERATIONAL_AREAS,
+        "heatmap": heatmap,
+        "summary": summary,
+        "details": details,
+    }
+
+
+class MultiCompareRequest(BaseModel):
+    policy_sections: Optional[list] = None
+    policy_text: Optional[str] = None
+    sample_policy_id: Optional[str] = None
+    threshold: float = 0.5
+
+
+@app.post("/api/compare-all")
+async def compare_all_regulations(req: MultiCompareRequest):
+    """Compare a policy against ALL regulations and return a risk heatmap."""
+    try:
+        sections, policy_id = _resolve_policy_sections(
+            req.sample_policy_id, req.policy_text, req.policy_sections,
+        )
+        if not sections:
+            raise HTTPException(status_code=400, detail="No sections found in policy document")
+        return _build_multi_comparison(sections, policy_id, req.threshold)
+    except HTTPException:
+        raise
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/compare-all-upload")
+async def compare_all_uploaded(file: UploadFile = File(...), threshold: float = 0.5):
+    """Upload a PDF or TXT file and compare against ALL regulations."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+    content = await file.read()
+    sections = _extract_sections_from_bytes(content, file.filename)
+    if not sections:
+        raise HTTPException(status_code=400, detail="No sections could be extracted from the file")
+    result = _build_multi_comparison(sections, file.filename, threshold)
     result["filename"] = file.filename
     result["sections_extracted"] = len(sections)
     return result

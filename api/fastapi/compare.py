@@ -131,15 +131,19 @@ def compare_policy_to_regulation(
     regulation_id: str = "pipeda",
     threshold: float = THRESHOLD,
     policy_id: str = "uploaded_policy",
+    embedder: Optional[object] = None,
+    policy_embeddings: Optional[np.ndarray] = None,
 ) -> Dict:
     """Compare company policy sections against a regulation.
 
     For each regulation obligation/prohibition, find the best matching
     policy section using cosine similarity of embeddings, then compute
     a residual_risk value on the resulting mapping edge.
-    """
-    from ingestion.embed.embedder import Embedder
 
+    Pass `embedder` and `policy_embeddings` to reuse across multiple
+    regulation comparisons (avoids reloading the model and re-embedding
+    the policy for each regulation).
+    """
     reg_sections = load_regulation_sections(regulation_id)
     obligations = get_obligation_sections(reg_sections)
 
@@ -162,10 +166,13 @@ def compare_policy_to_regulation(
             "threshold": threshold,
         }
 
-    embedder = Embedder()
+    if embedder is None:
+        from ingestion.embed.embedder import get_embedder
+        embedder = get_embedder()
 
-    policy_texts = [s.get("body", s.get("title", "")) for s in policy_sections]
-    policy_embeddings = embedder.embed_texts(policy_texts)
+    if policy_embeddings is None:
+        policy_texts = [s.get("body", s.get("title", "")) for s in policy_sections]
+        policy_embeddings = embedder.embed_texts(policy_texts)
 
     reg_texts = [s.get("body", s.get("title", "")) for s in obligations]
     reg_embeddings = embedder.embed_texts(reg_texts)

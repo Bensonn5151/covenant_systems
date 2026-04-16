@@ -260,6 +260,21 @@ class Embedder:
         return float(dot_product / (norm1 * norm2))
 
 
+# ── Singleton accessor ──────────────────────────────────────────────────────
+# Use get_embedder() instead of Embedder() when you need the model across
+# multiple calls (e.g., comparing a policy against 9 regulations). The model
+# loads once (~2-5s) and is reused for all subsequent calls.
+
+_embedder_instance = None
+
+
+def get_embedder(model_name: str = "sentence-transformers/all-MiniLM-L6-v2") -> Embedder:
+    global _embedder_instance
+    if _embedder_instance is None:
+        _embedder_instance = Embedder(model_name=model_name)
+    return _embedder_instance
+
+
 # Convenience functions
 def embed_document(
     sections_path: str,

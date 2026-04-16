@@ -7,6 +7,7 @@ import type {
   HealthResponse,
   SamplePolicy,
   ComparisonResult,
+  MultiComparisonResult,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -64,6 +65,26 @@ export async function runComparisonWithText(policyText: string, regulationId = "
     method: "POST",
     body: JSON.stringify({ policy_text: policyText, regulation_id: regulationId }),
   });
+}
+
+export async function runMultiComparison(samplePolicyId: string): Promise<MultiComparisonResult> {
+  return fetchAPI("/api/compare-all", {
+    method: "POST",
+    body: JSON.stringify({ sample_policy_id: samplePolicyId }),
+  });
+}
+
+export async function runMultiComparisonWithFile(file: File): Promise<MultiComparisonResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${API_URL}/api/compare-all-upload`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    throw new Error(`API error ${res.status}: ${await res.text()}`);
+  }
+  return res.json();
 }
 
 export async function fetchCoverage(policyId: string, regulationId = "pipeda"): Promise<ComparisonResult> {
