@@ -2,13 +2,13 @@ import Link from 'next/link';
 import {
   ShieldCheck,
   Upload,
-  Search,
-  AlertTriangle,
+  Brain,
+  BarChart3,
   CheckCircle,
   ArrowRight,
-  FileText,
+  Scale,
   Zap,
-  GitBranch,
+  Eye,
   Lock,
 } from 'lucide-react';
 
@@ -28,9 +28,6 @@ export default function Home() {
           <span>Covenant Systems</span>
         </Link>
         <div className="flex items-center gap-2 sm:gap-6">
-          <Link href="/dashboard" className="hidden sm:block text-sm text-gray-400 hover:text-white transition-colors">
-            Dashboard
-          </Link>
           <Link href="/sign-in" className="text-sm text-gray-400 hover:text-white transition-colors">
             Sign in
           </Link>
@@ -44,7 +41,7 @@ export default function Home() {
       <section className="relative z-10 max-w-6xl mx-auto px-6 pt-20 pb-24 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-mono mb-8">
           <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-          509 regulatory obligations indexed | PIPEDA, Privacy Act, PCMLTFA
+          9 regulations | 129 obligations | LLM-powered analysis
         </div>
 
         <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tighter text-white mb-6 max-w-4xl mx-auto leading-[1.05]">
@@ -53,7 +50,7 @@ export default function Home() {
         </h1>
 
         <p className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-          Upload your privacy policy. We compare it against PIPEDA&apos;s 61 obligations and surface the gaps. Powered by semantic similarity, not keyword matching.
+          Upload your privacy policy. Our AI reads it against 9 Canadian privacy regulations and tells you exactly where you&apos;re exposed — with evidence and reasoning for every obligation.
         </p>
 
         <div className="flex items-center justify-center gap-3 flex-wrap">
@@ -72,7 +69,7 @@ export default function Home() {
         </div>
 
         <div className="mt-16 text-xs text-gray-600 font-mono">
-          No credit card required | Try with sample policies | Open source
+          Open source
         </div>
       </section>
 
@@ -91,19 +88,19 @@ export default function Home() {
               num="01"
               icon={Upload}
               title="Upload your policy"
-              desc="Drop a PDF or text file of your company's privacy policy. We extract and parse it into structured sections."
+              desc="Drop a PDF or text file of your company's privacy policy. We parse it into structured sections automatically."
             />
             <Step
               num="02"
-              icon={Search}
-              title="Semantic comparison"
-              desc="Each section is embedded into a 384-dimensional vector and compared against PIPEDA obligations using cosine similarity."
+              icon={Brain}
+              title="AI reads both documents"
+              desc="Our LLM reads every obligation in 9 regulations alongside your policy and determines: covered, partial, or gap — with reasoning."
             />
             <Step
               num="03"
-              icon={CheckCircle}
-              title="Get gap report"
-              desc="See which regulations you cover, where you fall short, and exactly which sections need work — with similarity scores."
+              icon={BarChart3}
+              title="See your risk heatmap"
+              desc="A visual grid shows your exposure across 8 operational areas and 9 regulations. Click any cell to see exactly which obligations are unmet."
             />
           </div>
         </div>
@@ -114,28 +111,28 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <DemoCard
             company="Apex Financial Group"
-            score={78.7}
-            color="green"
-            label="Compliant policy"
-            note="Comprehensive coverage of all 10 fair information principles"
+            score={62.5}
+            color="amber"
+            label="Partial coverage"
+            note="Strong on data use and retention, gaps in breach notification and accountability"
           />
           <DemoCard
             company="NorthStar Banking"
-            score={24.6}
-            color="amber"
-            label="Mixed compliance"
-            note="Missing breach notification, weak on accountability"
+            score={18.3}
+            color="red"
+            label="Significant gaps"
+            note="Missing consent mechanisms, weak on cross-border data disclosure"
           />
           <DemoCard
             company="QuickLend Inc."
-            score={8.2}
+            score={1.6}
             color="red"
-            label="Non-compliant"
-            note="Bare minimum policy missing critical obligations"
+            label="Critical exposure"
+            note="Policy addresses almost none of the 61 PIPEDA obligations"
           />
         </div>
         <p className="text-center text-xs text-gray-600 font-mono mt-6">
-          Real results from running our 3 sample policies against PIPEDA
+          Real results from LLM analysis of 3 sample policies against 9 Canadian privacy regulations
         </p>
       </section>
 
@@ -151,24 +148,24 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Feature
-              icon={FileText}
-              title="22,000+ sections"
-              desc="Bronze/Silver/Gold pipeline with hierarchical segmentation across 9 documents"
+              icon={Scale}
+              title="9 regulations ingested"
+              desc="PIPEDA, Privacy Act, 2 SOR regulations, and 5 OPC guidance documents — 509 sections classified"
             />
             <Feature
-              icon={GitBranch}
-              title="Knowledge Graph"
-              desc="509 nodes, 121 edges mapping cross-references between regulations"
+              icon={Brain}
+              title="LLM-powered reasoning"
+              desc="Every verdict comes with evidence: which policy clause was matched, and why the LLM considers it covered or not"
             />
             <Feature
-              icon={Zap}
-              title="Sub-second search"
-              desc="FAISS vector index with cosine similarity. No API calls, no latency"
+              icon={Eye}
+              title="Risk heatmap"
+              desc="8 operational areas x 9 regulations. Color-coded by residual risk. Click any cell to drill into the gaps"
             />
             <Feature
               icon={Lock}
               title="Auditable"
-              desc="Every match has a similarity score. Every classification cites source text"
+              desc="Every gap cites the regulation section. Every match quotes the policy clause. No black-box scores"
             />
           </div>
         </div>
@@ -180,7 +177,7 @@ export default function Home() {
           Stop guessing about compliance.
         </h2>
         <p className="text-gray-400 mb-8 max-w-xl mx-auto">
-          Get an honest, scored breakdown of where your policy stands against Canadian privacy law.
+          Get an honest, evidence-backed breakdown of where your policy stands against Canadian privacy law.
         </p>
         <Link
           href="/dashboard"
@@ -235,7 +232,7 @@ function DemoCard({ company, score, color, label, note }: { company: string; sco
       <div className="text-xs font-mono uppercase opacity-70 mb-2">{label}</div>
       <div className="flex items-baseline gap-2 mb-3">
         <span className={`text-4xl font-bold ${colors[color].split(' ')[0]}`}>{score}%</span>
-        <span className="text-xs text-gray-500">compliance</span>
+        <span className="text-xs text-gray-500">coverage</span>
       </div>
       <div className="text-sm font-medium text-white mb-1">{company}</div>
       <div className="text-xs text-gray-500">{note}</div>
