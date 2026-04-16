@@ -5,6 +5,7 @@ Exposes the regulatory compliance pipeline via REST API endpoints.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Optional, List
@@ -20,12 +21,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 app = FastAPI(
     title="Covenant Systems API",
     description="AI Regulatory Compliance Platform - Bronze/Silver/Gold Pipeline",
-    version="0.3.0",
+    version="0.4.0",
 )
 
+# CORS — in production, set ALLOWED_ORIGINS to your Vercel domain.
+# Defaults to permissive for local development.
+_allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins.split(",") if _allowed_origins != "*" else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -510,16 +514,38 @@ async def list_regulations():
             continue
         first = sections[0] if sections else {}
         meta = first.get("metadata", {}) if isinstance(first.get("metadata"), dict) else {}
-        obligations = sum(1 for s in sections
-                        if isinstance(s.get("classification"), dict) and
-                        s["classification"].get("label") in ("obligation", "prohibition"))
+
+        obligations_count = 0
+        prohibitions_count = 0
+        definitions_count = 0
+        severity_signal_breakdown = {
+            "punitive": 0, "mandatory": 0, "procedural": 0, "definitional": 0,
+        }
+        for s in sections:
+            cls = s.get("classification") or {}
+            label = cls.get("label", "") if isinstance(cls, dict) else ""
+            if label == "obligation":
+                obligations_count += 1
+            elif label == "prohibition":
+                prohibitions_count += 1
+            elif label == "definition":
+                definitions_count += 1
+            sig = s.get("severity_signal")
+            if sig in severity_signal_breakdown:
+                severity_signal_breakdown[sig] += 1
+
         regs.append({
             "id": doc_id,
             "document_type": meta.get("document_type", ""),
             "jurisdiction": meta.get("jurisdiction", ""),
+            "regulator": meta.get("regulator", ""),
             "category": meta.get("category", ""),
             "total_sections": len(sections),
-            "obligations_count": obligations,
+            "obligations_count": obligations_count,
+            "prohibitions_count": prohibitions_count,
+            "definitions_count": definitions_count,
+            "severity_signal_breakdown": severity_signal_breakdown,
+            "last_amended": meta.get("last_amended", ""),
         })
     regs.sort(key=lambda r: r["obligations_count"], reverse=True)
     return {"regulations": regs}
@@ -613,6 +639,38 @@ async def compare_uploaded_file(file: UploadFile = File(...), regulation_id: str
     return result
 
 
+# ── Compliance Coverage (policy ↔ regulation mapping) ────────────────────────
+
+@app.get("/api/compliance/coverage")
+async def compliance_coverage(
+    policy_id: str,
+    regulation_id: str = "pipeda",
+    threshold: float = 0.5,
+):
+    """Evaluate a sample policy against a regulation and return the mapping
+    edges, including residual risk on each gap. This is the ONLY API
+    surface in the system that exposes risk values."""
+    from api.fastapi.compare import compare_policy_to_regulation, parse_text_to_sections
+
+    policy_path = SAMPLE_POLICIES / f"{policy_id}.txt"
+    if not policy_path.exists():
+        raise HTTPException(status_code=404, detail=f"Policy not found: {policy_id}")
+
+    sections = parse_text_to_sections(policy_path.read_text())
+    if not sections:
+        raise HTTPException(status_code=400, detail="No sections could be parsed from the policy")
+
+    try:
+        return compare_policy_to_regulation(
+            policy_sections=sections,
+            regulation_id=regulation_id,
+            threshold=threshold,
+            policy_id=policy_id,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 # ── Dashboard Endpoints ──────────────────────────────────────────────────────
 
 def _load_all_gold_sections() -> list:
@@ -630,49 +688,48 @@ def _load_all_gold_sections() -> list:
 
 @app.get("/api/dashboard/stats")
 async def dashboard_stats():
+    """Regulation-catalog statistics.
+
+    Risk is NOT reported here — risk is relational and only exists when a
+    specific policy is compared to a specific regulation (see
+    /api/compliance/coverage). This endpoint surfaces the regulation
+    corpus structure: classifications and severity-signal distribution.
+    """
     sections = _load_all_gold_sections()
     total = len(sections)
 
-    # Classification counts
     classifications = {"obligation": 0, "prohibition": 0, "permission": 0, "definition": 0, "procedural": 0}
-    risk_levels = {"low": 0, "medium": 0, "high": 0, "critical": 0}
+    severity_signals = {"punitive": 0, "mandatory": 0, "procedural": 0, "definitional": 0}
     operational_areas: dict = {}
-    high_risk_items = []
+    punitive_obligations: list = []  # obligations/prohibitions with punitive language
 
-    # Per-document stats
     doc_stats: dict = {}
 
     for s in sections:
-        # Classification
         cls = s.get("classification", {})
         label = cls.get("label", "procedural") if isinstance(cls, dict) else "procedural"
         if label in classifications:
             classifications[label] += 1
 
-        # Risk
-        risk = s.get("risk", {})
-        level = risk.get("risk_level", "low") if isinstance(risk, dict) else "low"
-        if level in risk_levels:
-            risk_levels[level] += 1
+        signal = s.get("severity_signal")
+        if signal in severity_signals:
+            severity_signals[signal] += 1
 
-        # Operational areas
-        areas = risk.get("operational_areas", []) if isinstance(risk, dict) else []
+        areas = s.get("operational_areas", []) or []
         for area in areas:
             operational_areas[area] = operational_areas.get(area, 0) + 1
 
-        # High risk items
-        if level in ("high", "critical"):
-            high_risk_items.append({
+        if label in ("obligation", "prohibition") and signal == "punitive":
+            punitive_obligations.append({
                 "section_id": s.get("section_id", ""),
                 "title": s.get("title", ""),
                 "body": s.get("body", "")[:200],
                 "document": s.get("metadata", {}).get("document_id", "") if isinstance(s.get("metadata"), dict) else "",
-                "risk_level": level,
+                "severity_signal": signal,
                 "classification": label,
                 "operational_areas": areas,
             })
 
-        # Per-document
         doc_id = s.get("metadata", {}).get("document_id", "unknown") if isinstance(s.get("metadata"), dict) else "unknown"
         if doc_id not in doc_stats:
             doc_stats[doc_id] = {
@@ -681,37 +738,32 @@ async def dashboard_stats():
                 "jurisdiction": s.get("metadata", {}).get("jurisdiction", "") if isinstance(s.get("metadata"), dict) else "",
                 "category": s.get("metadata", {}).get("category", "") if isinstance(s.get("metadata"), dict) else "",
                 "section_count": 0,
-                "risk_breakdown": {"low": 0, "medium": 0, "high": 0, "critical": 0},
+                "severity_signal_breakdown": {"punitive": 0, "mandatory": 0, "procedural": 0, "definitional": 0},
                 "classification_breakdown": {"obligation": 0, "prohibition": 0, "permission": 0, "definition": 0, "procedural": 0},
             }
         doc_stats[doc_id]["section_count"] += 1
-        if level in doc_stats[doc_id]["risk_breakdown"]:
-            doc_stats[doc_id]["risk_breakdown"][level] += 1
+        if signal in doc_stats[doc_id]["severity_signal_breakdown"]:
+            doc_stats[doc_id]["severity_signal_breakdown"][signal] += 1
         if label in doc_stats[doc_id]["classification_breakdown"]:
             doc_stats[doc_id]["classification_breakdown"][label] += 1
 
-    # Health score: (1 - high_risk / total) * 100
-    high_count = risk_levels.get("high", 0) + risk_levels.get("critical", 0)
-    health_score = round(((total - high_count) / total) * 100, 1) if total > 0 else 0
-
-    # Sort high risk items by confidence descending, limit to 20
-    high_risk_items.sort(key=lambda x: x.get("risk_level", ""), reverse=True)
-    high_risk_items = high_risk_items[:20]
+    punitive_obligations = punitive_obligations[:20]
 
     return {
         "total_sections": total,
         "total_documents": len(doc_stats),
         "classifications": classifications,
-        "risk_levels": risk_levels,
+        "severity_signals": severity_signals,
         "operational_areas": operational_areas,
-        "compliance_health_score": health_score,
-        "high_risk_sections": high_risk_items,
+        "punitive_obligations": punitive_obligations,
         "documents": list(doc_stats.values()),
     }
 
 
 @app.get("/api/dashboard/documents")
 async def dashboard_documents():
+    """Regulation tile data. Never returns risk — risk is relational and
+    belongs to /api/compliance/coverage."""
     documents = []
     for sections_file in STORAGE.glob("gold/*/sections.json"):
         doc_id = sections_file.parent.name
@@ -723,29 +775,30 @@ async def dashboard_documents():
             first = sections[0] if sections else {}
             meta = first.get("metadata", {}) if isinstance(first.get("metadata"), dict) else {}
 
-            risk_breakdown = {"low": 0, "medium": 0, "high": 0, "critical": 0}
             classification_breakdown = {"obligation": 0, "prohibition": 0, "permission": 0, "definition": 0, "procedural": 0}
+            severity_signal_breakdown = {"punitive": 0, "mandatory": 0, "procedural": 0, "definitional": 0}
 
             for s in sections:
-                risk = s.get("risk", {})
-                level = risk.get("risk_level", "low") if isinstance(risk, dict) else "low"
-                if level in risk_breakdown:
-                    risk_breakdown[level] += 1
-
                 cls = s.get("classification", {})
                 label = cls.get("label", "procedural") if isinstance(cls, dict) else "procedural"
                 if label in classification_breakdown:
                     classification_breakdown[label] += 1
 
+                signal = s.get("severity_signal")
+                if signal in severity_signal_breakdown:
+                    severity_signal_breakdown[signal] += 1
+
             documents.append({
                 "document_id": doc_id,
                 "document_type": meta.get("document_type", ""),
                 "jurisdiction": meta.get("jurisdiction", ""),
+                "regulator": meta.get("regulator", ""),
                 "category": meta.get("category", ""),
                 "section_count": len(sections),
-                "risk_breakdown": risk_breakdown,
                 "classification_breakdown": classification_breakdown,
+                "severity_signal_breakdown": severity_signal_breakdown,
                 "processed_date": meta.get("processed_date", ""),
+                "last_amended": meta.get("last_amended", ""),
             })
         except Exception:
             continue
@@ -768,7 +821,6 @@ async def dashboard_document_detail(document_id: str):
         normalized = []
         for s in sections:
             cls = s.get("classification", {})
-            risk = s.get("risk", {})
             meta = s.get("metadata", {}) if isinstance(s.get("metadata"), dict) else {}
             normalized.append({
                 "section_id": s.get("section_id", ""),
@@ -778,8 +830,8 @@ async def dashboard_document_detail(document_id: str):
                 "level": s.get("level", 0),
                 "classification": cls.get("label", "procedural") if isinstance(cls, dict) else "procedural",
                 "classification_confidence": cls.get("confidence", 0) if isinstance(cls, dict) else 0,
-                "risk_level": risk.get("risk_level", "low") if isinstance(risk, dict) else "low",
-                "operational_areas": risk.get("operational_areas", []) if isinstance(risk, dict) else [],
+                "severity_signal": s.get("severity_signal"),
+                "operational_areas": s.get("operational_areas", []) or [],
                 "document_type": meta.get("document_type", ""),
                 "jurisdiction": meta.get("jurisdiction", ""),
                 "category": meta.get("category", ""),
@@ -811,6 +863,7 @@ async def knowledge_graph():
             data = yaml.safe_load(f) or {}
         raw_nodes = data.get("nodes", [])
         for n in raw_nodes:
+            meta = n.get("metadata") or {}
             node = {
                 "id": n.get("id", ""),
                 "type": n.get("type", ""),
@@ -818,7 +871,7 @@ async def knowledge_graph():
                 "section_number": n.get("section_number", ""),
                 "text": n.get("text", "")[:200],
                 "domains": n.get("domains", []),
-                "risk_level": n.get("risk_level", ""),
+                "severity_signal": meta.get("severity_signal") if isinstance(meta, dict) else None,
             }
             nodes.append(node)
             for d in node["domains"]:

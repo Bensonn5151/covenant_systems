@@ -7,7 +7,7 @@ import Link from "next/link";
 import { fetchDocument } from "@/lib/api";
 import type { GoldSection } from "@/lib/types";
 import ClassificationBadge from "@/components/shared/ClassificationBadge";
-import RiskBadge from "@/components/shared/RiskBadge";
+import SeverityBadge from "@/components/shared/SeverityBadge";
 
 export default function DocumentDetailPage() {
   const params = useParams();
@@ -87,7 +87,7 @@ export default function DocumentDetailPage() {
               <span className="text-sm text-gray-300 flex-1 truncate">{s.title}</span>
               <div className="flex items-center gap-2 shrink-0">
                 <ClassificationBadge label={s.classification} />
-                <RiskBadge level={s.risk_level} />
+                <SeverityBadge signal={s.severity_signal} />
               </div>
             </button>
             {expanded.has(s.section_id) && (

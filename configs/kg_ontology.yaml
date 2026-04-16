@@ -1,5 +1,12 @@
 # Knowledge Graph Ontology
 # Defines the schema for nodes, edges, and properties in the regulatory graph.
+#
+# CORE RULE
+# ---------
+# Regulations, sections, obligations, and prohibitions are GROUND TRUTH.
+# They DO NOT own risk. Risk only exists on the `policy_implements_regulation`
+# edge, where a specific company policy is evaluated against a specific
+# regulatory obligation. See §13 of CLAUDE.md.
 
 # ==========================================
 # 1. Node Types (Entities)
@@ -14,6 +21,7 @@ node_types:
       - jurisdiction: string
       - regulator: string
       - effective_date: date
+      - last_amended: date (optional)
 
   section:
     description: "A specific section within a regulation (e.g., Section 6(1))"
@@ -30,19 +38,23 @@ node_types:
       - definition_text: string
       - source_section: string (ref)
 
-  # --- Compliance Entities ---
+  # --- Compliance Entities (derived from Silver sections) ---
+  # severity_signal describes the LANGUAGE of the regulation text — it is
+  # NOT a risk rating. A "punitive" signal means the text references
+  # penalties/fines/imprisonment; "mandatory" means shall/must; "procedural"
+  # describes filing/notice steps; "definitional" describes terms.
   obligation:
     description: "A mandatory requirement extracted from text (MUST/SHALL)"
     properties:
       - description: string
-      - risk_level: enum[low, medium, high, critical]
-      - penalty: string (optional)
+      - severity_signal: enum[definitional, procedural, mandatory, punitive]
+      - penalty_text: string (optional, verbatim from source)
 
   prohibition:
     description: "An explicit restriction (MUST NOT/SHALL NOT)"
     properties:
       - description: string
-      - risk_level: enum[low, medium, high, critical]
+      - severity_signal: enum[definitional, procedural, mandatory, punitive]
 
   permission:
     description: "An allowance or right (MAY/CAN)"
@@ -57,6 +69,14 @@ node_types:
       - title: string
       - owner: string
       - last_review: date
+
+  policy_clause:
+    description: "A single clause within a company policy document"
+    properties:
+      - id: string
+      - title: string
+      - body: string
+      - parent_policy_id: string (ref)
 
   control:
     description: "Internal control or procedure implementing a policy"
@@ -98,15 +118,25 @@ edge_types:
     to: [section, policy]
 
   # --- Compliance Mappings ---
-  implements:
-    description: "Policy/Control satisfies a Regulation"
-    from: [policy, control]
-    to: [regulation, section, obligation]
+  # `policy_implements_regulation` is the ONLY edge type in the ontology that
+  # owns a risk value. Risk is relational: it exists where a specific policy
+  # clause is measured against a specific regulatory obligation.
+  policy_implements_regulation:
+    description: "A company policy clause implements a regulatory obligation (fully, partially, or not at all)"
+    from: [policy, policy_clause, control]
+    to: [regulation, section, obligation, prohibition]
+    properties:
+      - coverage_status: enum[covered, partial, gap]
+      - coverage_score: float[0.0, 1.0]   # cosine similarity
+      - residual_risk: enum[low, medium, high, critical]
+      - evidence_policy_section_ids: list[string]
+      - confidence: float[0.0, 1.0]
+      - last_evaluated: date
 
   mitigates:
-    description: "Control reduces a specific Risk"
+    description: "Control reduces the residual_risk on a policy_implements_regulation edge"
     from: [control]
-    to: [obligation, prohibition]
+    to: [policy_implements_regulation]
 
 # ==========================================
 # 3. Domain Taxonomy (Tags)
@@ -115,15 +145,15 @@ domains:
   - id: AML
     name: "Anti-Money Laundering"
     keywords: [laundering, terrorist financing, kyc, fintrac]
-  
+
   - id: PRIVACY
     name: "Privacy & Data Protection"
     keywords: [personal information, consent, breach, pipeda]
-  
+
   - id: CYBER
     name: "Cybersecurity"
     keywords: [encryption, incident response, access control]
-  
+
   - id: CONSUMER
     name: "Consumer Protection"
     keywords: [disclosure, complaint, fee, fcac]

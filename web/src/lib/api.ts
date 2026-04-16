@@ -66,6 +66,11 @@ export async function runComparisonWithText(policyText: string, regulationId = "
   });
 }
 
+export async function fetchCoverage(policyId: string, regulationId = "pipeda"): Promise<ComparisonResult> {
+  const params = new URLSearchParams({ policy_id: policyId, regulation_id: regulationId });
+  return fetchAPI(`/api/compliance/coverage?${params}`);
+}
+
 export async function runComparisonWithFile(file: File, regulationId = "pipeda"): Promise<ComparisonResult> {
   const formData = new FormData();
   formData.append("file", file);

@@ -1,0 +1,22 @@
+# Render Blueprint — deploys the FastAPI backend as a Docker web service
+# Docs: https://docs.render.com/blueprint-spec
+#
+# Usage:
+#   1. Push this repo to GitHub
+#   2. In Render dashboard → New → Blueprint → select this repo
+#   3. Render reads this file and creates the service automatically
+
+services:
+  - type: web
+    name: covenant-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PYTHON_ENV
+        value: production
+      - key: ALLOWED_ORIGINS
+        value: https://covenant-systems.vercel.app
+      # Add your Supabase connection string in the Render dashboard:
+      # - key: DATABASE_URL
+      #   value: postgresql://...

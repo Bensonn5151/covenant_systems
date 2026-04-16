@@ -1,7 +1,7 @@
 # Section Classification Rules for Canadian Privacy Legislation
 #
 # Rule-based classification using regex patterns on legal modal verbs.
-# Used by: ingestion/classify/section_classifier.py, risk_scorer.py
+# Used by: ingestion/classify/section_classifier.py, severity_signal.py
 
 classification:
   obligation:
@@ -51,8 +51,16 @@ classification:
       - '\bapplication of\b'
     min_confidence: 0.65
 
-risk_scoring:
-  high:
+# severity_signals describe the LANGUAGE STRENGTH of regulation text.
+# They are NOT risk ratings. "punitive" means the section text mentions
+# enforcement (penalties, fines, imprisonment, offences); "mandatory" means
+# shall/must/required; "procedural" describes filing/notice mechanics;
+# "definitional" covers defined terms and short-title style sections.
+#
+# Risk is relational and lives on policy_implements_regulation edges —
+# see configs/kg_ontology.yaml and CLAUDE.md §13.
+severity_signals:
+  punitive:
     patterns:
       - '\boffence\b'
       - '\bpenalt(?:y|ies)\b'
@@ -64,7 +72,7 @@ risk_scoring:
       - '\bmust not\b'
       - '\bsecurity safeguards?\b'
       - '\bnotif(?:y|ication)\b.*\bbreach\b'
-  medium:
+  mandatory:
     patterns:
       - '\bshall\b'
       - '\bmust\b'
@@ -72,7 +80,15 @@ risk_scoring:
       - '\bobligation\b'
       - '\bconsent\b'
       - '\bpurpose\b.*\bcollect'
-  low:
+  procedural:
+    patterns:
+      - '\bshall be filed\b'
+      - '\bnotice shall be given\b'
+      - '\bwithin \d+ days\b'
+      - '\bin the prescribed form\b'
+      - '\bcoming into force\b'
+      - '\bapplication of\b'
+  definitional:
     patterns:
       - '\bmay\b'
       - '\bmeans\b'

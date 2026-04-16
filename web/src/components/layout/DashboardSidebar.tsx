@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shield, Search, GitBranch, FileText, ArrowLeft } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
+import { Shield, ShieldCheck } from "lucide-react";
 
 const navItems = [
-  { href: "/dashboard", label: "Analysis", icon: Shield },
-  { href: "/dashboard/search", label: "Search", icon: Search },
-  { href: "/dashboard/documents", label: "Regulations", icon: FileText },
-  { href: "/dashboard/knowledge-graph", label: "Knowledge Graph", icon: GitBranch },
+  { href: "/dashboard", label: "Compliance Analysis", icon: Shield },
 ];
 
 export default function DashboardSidebar() {
@@ -17,10 +15,10 @@ export default function DashboardSidebar() {
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-56 bg-[#0a0a0a] border-r border-gray-800 flex flex-col z-40">
       <div className="p-4 border-b border-gray-800">
-        <Link href="/" className="flex items-center gap-2 text-green-500 font-mono text-sm font-bold hover:text-green-400 transition-colors">
-          <ArrowLeft className="w-4 h-4" />
+        <div className="flex items-center gap-2 text-green-500 font-mono text-sm font-bold">
+          <ShieldCheck className="w-4 h-4" />
           Covenant Systems
-        </Link>
+        </div>
       </div>
       <nav className="flex-1 p-3 space-y-1">
         {navItems.map(({ href, label, icon: Icon }) => {
@@ -41,8 +39,15 @@ export default function DashboardSidebar() {
           );
         })}
       </nav>
-      <div className="p-4 border-t border-gray-800">
-        <div className="text-xs text-gray-600 font-mono">v0.3.0 — operational</div>
+      <div className="p-4 border-t border-gray-800 flex items-center justify-between">
+        <div className="text-xs text-gray-600 font-mono">v0.4.0</div>
+        <UserButton
+          appearance={{
+            elements: {
+              avatarBox: "w-7 h-7",
+            },
+          }}
+        />
       </div>
     </aside>
   );

@@ -4,11 +4,15 @@ Gold Layer Builder
 Orchestrates the complete Silver → Gold transformation:
 1. Generate embeddings (via existing Embedder)
 2. Classify sections (obligation/permission/prohibition/definition/procedural)
-3. Score risk (high/medium/low)
+3. Score severity signal (definitional/procedural/mandatory/punitive)
+   — language strength of the regulation text, NOT risk
 4. Detect cross-references
-5. Build knowledge graph entries
+5. Build knowledge graph entries (no risk on regulation nodes)
 6. Persist Gold artifacts
 7. Build fresh FAISS index
+
+Risk is relational and belongs on policy_implements_regulation edges
+computed by api/fastapi/compare.py — never on regulation sections.
 
 Usage:
     python3 gold_builder.py
@@ -27,7 +31,7 @@ from collections import Counter
 
 from ingestion.embed.embedder import Embedder
 from ingestion.classify.section_classifier import SectionClassifier
-from ingestion.classify.risk_scorer import RiskScorer
+from ingestion.classify.severity_signal import SeveritySignalScorer
 from ingestion.classify.cross_reference import CrossReferenceDetector
 from storage.vector_db.faiss_manager import FAISSManager
 
@@ -48,7 +52,7 @@ class GoldBuilder:
         self.model_name = model_name
 
         self.classifier = SectionClassifier()
-        self.risk_scorer = RiskScorer()
+        self.severity_scorer = SeveritySignalScorer()
         self.embedder = None  # lazy-loaded
         self.all_sections = []
 
@@ -91,22 +95,25 @@ class GoldBuilder:
         """Classify all sections."""
         return self.classifier.classify_batch(sections)
 
-    def score_risks(self, sections: List[Dict], classifications: List[Dict]) -> List[Dict]:
-        """Score risk for all sections."""
-        return self.risk_scorer.score_batch(sections, classifications)
+    def score_severity_signals(self, sections: List[Dict], classifications: List[Dict]) -> List[Dict]:
+        """Score language-strength signals for all sections."""
+        return self.severity_scorer.score_batch(sections, classifications)
 
     def build_gold_sections(
         self,
         sections: List[Dict],
         classifications: List[Dict],
-        risk_scores: List[Dict],
+        severity_scores: List[Dict],
     ) -> List[Dict]:
-        """Merge Silver section + classification + risk into Gold record (no embeddings in JSON)."""
+        """Merge Silver section + classification + severity_signal into a Gold
+        record (no embeddings inside the JSON)."""
         gold_sections = []
         for i, section in enumerate(sections):
             gold = section.copy()
             gold["classification"] = classifications[i]
-            gold["risk"] = risk_scores[i]
+            sig = severity_scores[i] or {}
+            gold["severity_signal"] = sig.get("severity_signal")
+            gold["operational_areas"] = sig.get("operational_areas", [])
             gold["gold_created"] = datetime.utcnow().isoformat()
             gold_sections.append(gold)
         return gold_sections
@@ -140,7 +147,8 @@ class GoldBuilder:
             labels.append({
                 "section_id": gs["section_id"],
                 "classification": gs["classification"],
-                "risk": gs["risk"],
+                "severity_signal": gs.get("severity_signal"),
+                "operational_areas": gs.get("operational_areas", []),
             })
         with open(doc_gold_path / "semantic_labels.json", "w") as f:
             json.dump(labels, f, indent=2)
@@ -190,24 +198,31 @@ class GoldBuilder:
             "procedural": "section",
         }
 
-        # Build nodes
+        # Build nodes.
+        # IMPORTANT: regulation/section/obligation/prohibition nodes never
+        # carry risk_level. Risk only exists on policy_implements_regulation
+        # edges, which are computed when a company policy is compared to a
+        # regulation (see api/fastapi/compare.py).
         nodes = []
         for gs in all_sections_flat:
             cls = gs.get("classification", {})
-            risk = gs.get("risk", {})
+            node_type = kg_type_map.get(cls.get("label", "section"), "section")
+            metadata = {
+                "jurisdiction": gs.get("metadata", {}).get("jurisdiction", "Canada"),
+                "classification_confidence": cls.get("confidence", 0),
+                "operational_areas": gs.get("operational_areas", []),
+            }
+            # severity_signal only on obligation/prohibition nodes.
+            if node_type in ("obligation", "prohibition") and gs.get("severity_signal"):
+                metadata["severity_signal"] = gs["severity_signal"]
             nodes.append({
                 "id": gs["section_id"],
-                "type": kg_type_map.get(cls.get("label", "section"), "section"),
+                "type": node_type,
                 "source_document": gs.get("metadata", {}).get("document_id", ""),
                 "section_number": gs.get("section_number", ""),
                 "text": gs.get("body", "")[:500],
                 "domains": ["privacy"],
-                "metadata": {
-                    "jurisdiction": gs.get("metadata", {}).get("jurisdiction", "Canada"),
-                    "risk_level": risk.get("risk_level", "low"),
-                    "classification_confidence": cls.get("confidence", 0),
-                    "operational_areas": risk.get("operational_areas", []),
-                },
+                "metadata": metadata,
             })
 
         # Build edges
@@ -237,7 +252,7 @@ class GoldBuilder:
         doc_sections = self.load_all_sections(doc_paths)
         all_gold_docs = {}
         label_counts = Counter()
-        risk_counts = Counter()
+        severity_counts = Counter()
         total_sections = 0
 
         for doc_id, sections in doc_sections.items():
@@ -256,13 +271,15 @@ class GoldBuilder:
             for c in classifications:
                 label_counts[c["label"]] += 1
 
-            # 3. Risk scoring
-            risk_scores = self.score_risks(sections, classifications)
-            for r in risk_scores:
-                risk_counts[r["risk_level"]] += 1
+            # 3. Severity signal scoring (language strength, NOT risk)
+            severity_scores = self.score_severity_signals(sections, classifications)
+            for s in severity_scores:
+                sig = s.get("severity_signal")
+                if sig:
+                    severity_counts[sig] += 1
 
             # 4. Merge into Gold records
-            gold_sections = self.build_gold_sections(sections, classifications, risk_scores)
+            gold_sections = self.build_gold_sections(sections, classifications, severity_scores)
 
             # 5. Persist
             self.persist_gold(doc_id, gold_sections, embeddings)
@@ -291,8 +308,8 @@ class GoldBuilder:
         print(f"\nClassification:")
         for label, count in label_counts.most_common():
             print(f"  {label:15} {count:>4}")
-        print(f"\nRisk:")
-        for level, count in risk_counts.most_common():
+        print(f"\nSeverity signals (obligations + prohibitions):")
+        for level, count in severity_counts.most_common():
             print(f"  {level:15} {count:>4}")
         print(f"{'=' * 60}")
 

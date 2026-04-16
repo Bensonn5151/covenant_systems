@@ -93,18 +93,18 @@ Silver emits section-level JSON, e.g.:
 
 Goal: Make the content ready for intelligent reasoning.
 
-Gold includes:
+Gold holds:
 
 	•	High-quality embeddings per section
-	•	Additional classifier labels:
-	•	obligation / permission / prohibition
-	•	risk type
-	•	operational area
-	•	RAG-ready vectors
-	•	Eval responses from LLMs
-	•	Cross-document mappings (e.g., Bank Act → OSFI B-13 → Internal Policies)
+	•	Classifier labels about the text itself: obligation / permission / prohibition / definition / procedural
+	•	severity_signal (obligations and prohibitions only) — a description of the regulation's language strength: definitional / procedural / mandatory / punitive. **This is not risk.** It characterizes how the law is written, not the consequences to any particular company.
+	•	operational_areas — semantic tags (consent, breach_notification, etc.)
+	•	Extraction-quality signals (confidence, needs_human_review, reason) — internal only; these must never surface on public regulation tiles or cards.
+	•	Cross-document citation edges
 
-Gold is what powers the actual AI compliance engine.
+Gold does **not** hold risk. Risk is relational — it lives only on the
+`policy_implements_regulation` edge (see §11.4 and §13). Anything tagged
+"high risk" without a named policy context is a bug.
 
 
 
@@ -392,10 +392,10 @@ nodes.yaml contains:
 	•	control: Internal controls/procedures
 	•	policy: Company policies
 
-Example node:
+Example node (an obligation — note: no risk_level):
 ```yaml
 - id: "BA-6-1"
-  type: "regulation"
+  type: "obligation"
   source_document: "Bank Act (Canada)"
   section: "6(1)"
   text: "A bank shall not carry on business as a bank, except in accordance with this Act."
@@ -403,23 +403,31 @@ Example node:
   metadata:
     jurisdiction: "Canada"
     regulator: "OSFI"
-    risk_level: "high"
+    severity_signal: "punitive"   # describes the text's language strength, not a risk rating
     enforceable: true
     effective_date: "2024-01-01"
 ```
+
+**Prohibition: never store `risk_level` on a regulation, section,
+obligation, permission, or prohibition node.** Risk only exists on the
+`policy_implements_regulation` edge — see §11.4 and §13. `severity_signal`
+is the only near-risk-looking attribute permitted on a node, and it only
+applies to obligations and prohibitions; it describes the text's language,
+not consequences.
 
 ### 11.4 Edge Types
 
 edges.yaml contains relationships:
 	•	cites: Section A references Section B
-	•	requires: Section A mandates compliance with Section B
-	•	implements: Policy implements regulation
+	•	requires_alignment: Section A implicitly depends on Section B
 	•	conflicts_with: Potential conflict detected
 	•	supersedes: New regulation replaces old one
 	•	amends: Regulation modifies another
 	•	references: General reference/mention
+	•	policy_implements_regulation: A company policy clause implements a regulatory obligation (fully, partially, or not at all) — the only edge type that carries risk
+	•	mitigates: A control reduces residual_risk on a policy_implements_regulation edge
 
-Example edge:
+Example citation edge:
 ```yaml
 - from: "BA-6-1"
   to: "PCMLTFA-9"
@@ -429,6 +437,24 @@ Example edge:
   source: "legal_analysis"
   date_created: "2024-11-16"
 ```
+
+Example mapping edge (the only place risk lives):
+```yaml
+- from: "companyx_privacy_v3_s0044"   # policy clause
+  to: "pipeda_s0017"                  # regulatory obligation
+  type: "policy_implements_regulation"
+  coverage_status: "partial"          # covered | partial | gap
+  coverage_score: 0.62                # 0.0–1.0 cosine similarity
+  residual_risk: "medium"             # low | medium | high | critical
+  evidence_policy_section_ids: ["companyx_privacy_v3_s0044"]
+  confidence: 0.81
+  last_evaluated: "2026-04-15"
+```
+
+Residual risk on a mapping edge is a function of the obligation's
+`severity_signal` and the policy's `coverage_status`. A gap against a
+punitive obligation is `critical`; a full cover of a definitional
+section is `low`.
 
 ### 11.5 Domain Taxonomy
 
@@ -494,7 +520,65 @@ The KG can be exported to:
 
 ⸻
 
-## 12. We can work with an MVP then scale up from there: 
+## 13. COMPLIANCE REASONING MODEL (ontology contract)
+
+This is the single source of truth for the compliance ontology. Any code,
+schema, API response, or UI that drifts from this contract is a bug.
+
+**Entity classes and what each one owns**
+
+| Entity                           | Owns                                                                 | Never owns       |
+|----------------------------------|----------------------------------------------------------------------|------------------|
+| Regulation (ground truth)        | text, citation, jurisdiction, regulator, effective_date, last_amended | risk             |
+| Section                          | section_number, text, embeddings                                     | risk             |
+| Obligation / Prohibition (Gold)  | duty/restriction text, severity_signal, operational_areas            | risk             |
+| Permission / Definition (Gold)   | text, metadata                                                       | risk             |
+| Policy (customer input)          | title, owner, last_review                                            | risk             |
+| PolicyClause (customer input)    | title, body, parent_policy_id                                        | risk             |
+| **PolicyImplementsRegulation**   | coverage_status, coverage_score, **residual_risk**, evidence, confidence, last_evaluated | —                |
+| Control                          | description, type, frequency                                         | risk             |
+
+**Definitions**
+
+- `severity_signal` is a language-strength label on a regulation obligation
+  or prohibition. Values: `definitional | procedural | mandatory | punitive`.
+  It describes the TEXT (does this section mention penalties? does it use
+  shall/must?) — it is not a risk rating. Computed in
+  `ingestion/classify/severity_signal.py` and stored on Gold sections and
+  KG obligation/prohibition nodes.
+
+- `coverage_status` is a mapping-edge attribute: `covered | partial | gap`.
+  Computed by comparing a policy clause to a regulation obligation
+  (semantic similarity; see `api/fastapi/compare.py`).
+
+- `residual_risk` is a mapping-edge attribute: `low | medium | high | critical`.
+  Computed from `severity_signal × coverage_status`. A gap against a
+  punitive obligation is `critical`; a fully-covered definitional section
+  is `low`. This is the ONLY risk value in the system.
+
+**Corollaries Claude must enforce**
+
+1. A regulation tile, card, list row, or summary that surfaces risk without
+   a named policy context is a bug. Remove it.
+2. A regulation section's JSON/YAML that contains `risk_level` or a `risk`
+   object is stale — run `scripts/migrate_strip_risk_from_regulations.py`.
+3. "Needs review" is an extraction-quality state (confidence on the
+   classifier, OCR errors, etc.) and must never be conflated with risk or
+   shown on public regulation surfaces. It belongs behind an admin route.
+4. Risk-bearing outputs (dashboards, reports, emails) must name the policy
+   being evaluated and the regulation it was evaluated against. No orphan
+   risk values.
+
+**Where each concept lives in code**
+
+- Severity signal config: `configs/section_classification.yaml` → `severity_signals`
+- Severity signal scorer: `ingestion/classify/severity_signal.py`
+- Mapping edge schema: `ingestion/schemas.py` → `PolicyRegulationMapping`
+- Residual risk matrix: `api/fastapi/compare.py` → `_RESIDUAL_RISK_MATRIX`
+- Compliance API: `GET /api/compliance/coverage` (the only endpoint that
+  returns risk)
+
+## 14. We can work with an MVP then scale up from there: 
 /
 ├── data/
 |---regulations/

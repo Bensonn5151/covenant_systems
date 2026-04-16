@@ -1,14 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Shield, AlertTriangle, CheckCircle, XCircle, FileUp, Upload, Loader2 } from "lucide-react";
+import { Shield, CheckCircle, XCircle, AlertTriangle, FileUp, Upload, Loader2 } from "lucide-react";
 import { fetchSamplePolicies, runComparison, runComparisonWithFile } from "@/lib/api";
-import type { SamplePolicy, ComparisonResult } from "@/lib/types";
+import type { SamplePolicy, ComparisonResult, ComparisonMatch, RiskLevel, SeveritySignal } from "@/lib/types";
 import StatCard from "@/components/shared/StatCard";
 import ComplianceHealthScore from "@/components/dashboard/ComplianceHealthScore";
-import RiskBadge from "@/components/shared/RiskBadge";
-import ClassificationBadge from "@/components/shared/ClassificationBadge";
-import Link from "next/link";
 
 const AREA_LABELS: Record<string, string> = {
   data_collection: "Data Collection",
@@ -211,53 +208,121 @@ export default function DashboardOverview() {
             </div>
           </div>
 
-          {/* Top Gaps */}
+          {/* ── Compliance Gaps ──────────────────────────────── */}
           <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-xs text-gray-500 font-mono uppercase tracking-wider">Compliance Gaps ({result.gaps})</span>
-              <Link href="/dashboard/gaps" className="text-xs text-green-500 hover:text-green-400">View all</Link>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-500 font-mono uppercase tracking-wider">
+                Compliance Gaps ({result.gap_details.length})
+              </span>
+              <span className="text-xs text-gray-600 font-mono">
+                sorted by residual risk
+              </span>
             </div>
-            <p className="text-xs text-gray-600 mb-4">PIPEDA requirements not adequately addressed by your policy</p>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {result.gap_details.slice(0, 10).map((gap) => (
-                <div key={gap.regulation_section_id} className="p-3 bg-black/30 border border-gray-800 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <XCircle className="w-3.5 h-3.5 text-red-400" />
-                    <RiskBadge level={gap.risk_level} />
-                    <ClassificationBadge label={gap.classification} />
-                    <span className="text-xs text-gray-600 ml-auto font-mono">score: {(gap.best_match_score * 100).toFixed(0)}%</span>
+            <p className="text-xs text-gray-500 mb-5">
+              These PIPEDA requirements have <strong className="text-gray-300">no adequate clause</strong> in your policy.
+              <span className="text-amber-400/80 ml-1">Residual risk</span> reflects how exposed your organization is
+              given the severity of the obligation and the gap in coverage.
+            </p>
+
+            <div className="space-y-3 max-h-[32rem] overflow-y-auto">
+              {result.gap_details.slice(0, 10).map((gap) => {
+                const score = gap.coverage_score ?? gap.best_match_score ?? 0;
+                const risk = gap.residual_risk || "high";
+                const signal = gap.severity_signal || "mandatory";
+                return (
+                  <div key={gap.regulation_section_id} className="bg-black/30 border border-gray-800 rounded-lg overflow-hidden">
+                    {/* Risk header bar */}
+                    <div className={`px-4 py-2 flex items-center gap-3 border-b border-gray-800/50 ${
+                      risk === "critical" ? "bg-red-500/10" : risk === "high" ? "bg-red-500/5" : "bg-amber-500/5"
+                    }`}>
+                      <AlertTriangle className={`w-3.5 h-3.5 shrink-0 ${
+                        risk === "critical" ? "text-red-400" : risk === "high" ? "text-red-400/80" : "text-amber-400"
+                      }`} />
+                      <span className={`text-xs font-bold font-mono uppercase ${
+                        risk === "critical" ? "text-red-400" : risk === "high" ? "text-red-400/80" : "text-amber-400"
+                      }`}>{risk} risk</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono border ${
+                        signal === "punitive" ? "bg-purple-500/15 text-purple-300 border-purple-500/30"
+                        : signal === "mandatory" ? "bg-blue-500/15 text-blue-300 border-blue-500/30"
+                        : "bg-gray-700/30 text-gray-400 border-gray-700/50"
+                      }`}>{signal}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono border ${
+                        gap.classification === "prohibition"
+                          ? "bg-red-500/10 text-red-300 border-red-500/20"
+                          : "bg-blue-500/10 text-blue-300 border-blue-500/20"
+                      }`}>{gap.classification}</span>
+                      <span className="text-[10px] text-gray-600 font-mono ml-auto">
+                        nearest match: {(score * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    {/* Content */}
+                    <div className="px-4 py-3">
+                      <div className="text-sm text-gray-200 font-medium">
+                        {gap.regulation_title}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1.5 line-clamp-2 leading-relaxed">
+                        {gap.regulation_body}
+                      </div>
+                      <div className="mt-2.5 text-[10px] text-amber-500/80 font-mono">
+                        ACTION: Add a policy clause addressing this {gap.classification}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-300">{gap.regulation_title}</div>
-                  <div className="text-xs text-gray-500 mt-1 line-clamp-2">{gap.regulation_body}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
-          {/* Matched Sections */}
+          {/* ── Matched Sections ──────────────────────────────── */}
           <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-6">
-            <span className="text-xs text-gray-500 font-mono uppercase tracking-wider">Matched Sections ({result.covered})</span>
-            <p className="text-xs text-gray-600 mt-1 mb-4">Policy sections that cover regulatory requirements</p>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {result.matches.slice(0, 10).map((match) => (
-                <div key={match.regulation_section_id} className="p-3 bg-black/30 border border-gray-800 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle className="w-3.5 h-3.5 text-green-400" />
-                    <RiskBadge level={match.risk_level} />
-                    <span className="text-xs text-green-400 font-mono ml-auto">{(match.best_match_score * 100).toFixed(0)}% match</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 mt-2">
-                    <div>
-                      <div className="text-[10px] text-gray-600 font-mono uppercase mb-1">Regulation</div>
-                      <div className="text-xs text-gray-400">{match.regulation_title}</div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-500 font-mono uppercase tracking-wider">
+                Covered Obligations ({result.covered})
+              </span>
+              <span className="text-xs text-gray-600 font-mono">
+                sorted by match strength
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mb-5">
+              Your policy addresses these PIPEDA requirements. <span className="text-green-400/80">Match strength</span> is
+              the semantic similarity between the regulation obligation and the best-matching policy clause.
+            </p>
+
+            <div className="space-y-3 max-h-[32rem] overflow-y-auto">
+              {result.matches.slice(0, 10).map((match) => {
+                const score = match.coverage_score ?? match.best_match_score ?? 0;
+                const risk = match.residual_risk || "low";
+                return (
+                  <div key={match.regulation_section_id} className="bg-black/30 border border-gray-800 rounded-lg overflow-hidden">
+                    {/* Match header */}
+                    <div className="px-4 py-2 flex items-center gap-3 border-b border-gray-800/50 bg-green-500/5">
+                      <CheckCircle className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                      <span className={`text-xs font-bold font-mono ${
+                        score >= 0.7 ? "text-green-400" : score >= 0.55 ? "text-amber-400" : "text-gray-400"
+                      }`}>{(score * 100).toFixed(0)}% match</span>
+                      {risk !== "low" && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono border ${
+                          risk === "medium" ? "bg-amber-500/15 text-amber-300 border-amber-500/30" : "bg-green-500/15 text-green-300 border-green-500/30"
+                        }`}>residual: {risk}</span>
+                      )}
+                      <span className="text-[10px] text-gray-600 font-mono ml-auto">
+                        {match.classification}
+                      </span>
                     </div>
-                    <div>
-                      <div className="text-[10px] text-gray-600 font-mono uppercase mb-1">Your Policy</div>
-                      <div className="text-xs text-gray-400">{match.matched_policy_section}</div>
+                    {/* Side-by-side regulation ↔ policy */}
+                    <div className="grid grid-cols-2 divide-x divide-gray-800/50">
+                      <div className="px-4 py-3">
+                        <div className="text-[10px] text-gray-600 font-mono uppercase mb-1">Regulation Requirement</div>
+                        <div className="text-xs text-gray-300 leading-relaxed">{match.regulation_title}</div>
+                      </div>
+                      <div className="px-4 py-3">
+                        <div className="text-[10px] text-gray-600 font-mono uppercase mb-1">Your Policy Clause</div>
+                        <div className="text-xs text-gray-300 leading-relaxed">{match.matched_policy_section || "—"}</div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </>

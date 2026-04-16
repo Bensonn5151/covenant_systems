@@ -79,7 +79,14 @@ class GoldMetadata(BaseModel):
 
 
 class GoldSection(BaseModel):
-    """Silver section enriched with classification and risk (storage/gold/*/sections.json)"""
+    """Silver section enriched with classification + severity_signal.
+
+    NOTE: Gold sections do NOT carry a risk field. Risk is relational and
+    lives only on policy_implements_regulation edges (see
+    PolicyRegulationMapping below). severity_signal is a language-strength
+    label (definitional/procedural/mandatory/punitive) that describes the
+    regulation text itself — it is not a risk rating.
+    """
     section_id: str = Field(..., min_length=1)
     section_number: str
     section_type: str
@@ -92,8 +99,38 @@ class GoldSection(BaseModel):
     metadata: SectionMetadata
     citations: List[str] = []
     classification: Optional[Dict] = None
-    risk: Optional[Dict] = None
+    # Populated for obligation/prohibition only. One of:
+    #   definitional | procedural | mandatory | punitive
+    severity_signal: Optional[str] = None
+    operational_areas: List[str] = []
+    # Internal-only signals. Must never surface on public regulation
+    # tiles/cards. Shape: {confidence: float, needs_human_review: bool,
+    # reason: str}
+    extraction_quality: Optional[Dict] = None
     gold_created: Optional[str] = None
 
     class Config:
         extra = "allow"
+
+
+# =============================================================================
+# COMPLIANCE EDGE - Policy ↔ Regulation mapping (the ONLY place risk lives)
+# =============================================================================
+class PolicyRegulationMapping(BaseModel):
+    """A single edge recording how a policy clause implements (or fails to
+    implement) a specific regulatory obligation or prohibition.
+
+    This is the only entity in the system that owns risk. Residual risk
+    reflects the combination of language strength (severity_signal) on the
+    obligation, the coverage status of the policy, and the coverage score.
+    """
+    policy_id: str = Field(..., min_length=1)
+    policy_clause_id: Optional[str] = None
+    regulation_id: str = Field(..., min_length=1)
+    regulation_section_id: str = Field(..., min_length=1)
+    coverage_status: str  # covered | partial | gap
+    coverage_score: float = Field(..., ge=0.0, le=1.0)
+    residual_risk: str    # low | medium | high | critical
+    evidence_policy_section_ids: List[str] = []
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    last_evaluated: str   # ISO date
