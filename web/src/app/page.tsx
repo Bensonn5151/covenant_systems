@@ -1,116 +1,254 @@
-import Terminal from '@/components/Terminal';
-import ArchitectureCard from '@/components/ArchitectureCard';
-import CTAForm from '@/components/CTAForm';
-import { Database, Cpu, Network, ShieldCheck, Lock } from 'lucide-react';
+import Link from 'next/link';
+import {
+  ShieldCheck,
+  Upload,
+  Search,
+  AlertTriangle,
+  CheckCircle,
+  ArrowRight,
+  FileText,
+  Zap,
+  GitBranch,
+  Lock,
+} from 'lucide-react';
 
 export default function Home() {
   return (
-    <main className="min-h-screen flex flex-col bg-[#050505] text-gray-300 selection:bg-green-500/30 selection:text-green-200">
+    <main className="min-h-screen bg-[#050505] text-gray-300 selection:bg-green-500/30 selection:text-green-200">
 
-      {/* Background Grid Effect */}
+      {/* Background Grid */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-[0.15]" />
       </div>
 
-      {/* Hero Section */}
-      <section className="relative z-10 flex flex-col items-center justify-center pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full text-center">
-        <div className="mb-12 w-full">
-          <Terminal />
+      {/* Nav */}
+      <nav className="relative z-20 flex items-center justify-between px-6 lg:px-8 py-4 border-b border-gray-900">
+        <Link href="/" className="flex items-center gap-2 text-white font-bold hover:text-green-400 transition-colors">
+          <ShieldCheck className="w-5 h-5 text-green-500" />
+          <span>Covenant Systems</span>
+        </Link>
+        <div className="flex items-center gap-2 sm:gap-6">
+          <Link href="/dashboard" className="hidden sm:block text-sm text-gray-400 hover:text-white transition-colors">
+            Dashboard
+          </Link>
+          <Link href="/sign-in" className="text-sm text-gray-400 hover:text-white transition-colors">
+            Sign in
+          </Link>
+          <Link href="/sign-up" className="px-4 py-2 bg-green-500 text-black text-sm font-mono font-bold rounded hover:bg-green-400 transition-colors">
+            Get started
+          </Link>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="relative z-10 max-w-6xl mx-auto px-6 pt-20 pb-24 text-center">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-mono mb-8">
+          <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+          509 regulatory obligations indexed | PIPEDA, Privacy Act, PCMLTFA
         </div>
 
-        <h1 className="text-4xl md:text-6xl font-bold tracking-tighter text-white mb-6 max-w-4xl mx-auto">
-          Covenant Systems: The <span className="text-green-500">Operating System</span> for Regulation.
+        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tighter text-white mb-6 max-w-4xl mx-auto leading-[1.05]">
+          Find compliance gaps in your policies.{' '}
+          <span className="text-green-500">Before regulators do.</span>
         </h1>
 
         <p className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-          Turn static regulatory noise into dynamic, auditable action.
+          Upload your privacy policy. We compare it against PIPEDA&apos;s 61 obligations and surface the gaps. Powered by semantic similarity, not keyword matching.
         </p>
 
-        <button className="group relative inline-flex items-center justify-center px-8 py-4 font-mono font-bold text-black transition-all duration-200 bg-green-500 rounded hover:bg-green-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ring-offset-black">
-          <span className="absolute inset-0 w-full h-full -mt-1 rounded opacity-30 bg-gradient-to-b from-transparent via-transparent to-black"></span>
-          <span className="relative">EXECUTE_ACCESS()</span>
-        </button>
+        <div className="flex items-center justify-center gap-3 flex-wrap">
+          <Link
+            href="/dashboard"
+            className="group inline-flex items-center gap-2 px-6 py-3.5 bg-green-500 text-black font-mono font-bold text-sm rounded-lg hover:bg-green-400 transition-all"
+          >
+            Analyze a policy <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </Link>
+          <Link
+            href="/sign-up"
+            className="inline-flex items-center gap-2 px-6 py-3.5 border border-gray-700 text-gray-300 font-mono text-sm rounded-lg hover:border-gray-500 hover:text-white transition-all"
+          >
+            Create free account
+          </Link>
+        </div>
+
+        <div className="mt-16 text-xs text-gray-600 font-mono">
+          No credit card required | Try with sample policies | Open source
+        </div>
       </section>
 
-      {/* Architecture Section */}
-      <section className="relative z-10 py-24 bg-black/50 border-y border-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Built for Scale. Engineered for Trust.
+      {/* How It Works */}
+      <section className="relative z-10 py-20 border-y border-gray-900 bg-black/40">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <span className="text-xs text-green-500 font-mono uppercase tracking-wider">How it works</span>
+            <h2 className="text-3xl md:text-4xl font-bold text-white mt-3">
+              Three steps to compliance clarity
             </h2>
-            <div className="h-1 w-20 bg-green-500 mx-auto rounded-full" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <ArchitectureCard title="Ingestion" icon={Database}>
-              Automated pipelines ingest high-volume, multi-format regulatory data streams. Auditability from the source.
-            </ArchitectureCard>
-
-            <ArchitectureCard title="Intelligence Engine" icon={Cpu}>
-              Proprietary mapping logic connects external requirements to internal controls, policies, and evidence nodes.
-            </ArchitectureCard>
-
-            <ArchitectureCard title="Orchestration" icon={Network}>
-              Trigger automated workflows for documentation, escalation, and evidence gathering using auditable compliance flows.
-            </ArchitectureCard>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Step
+              num="01"
+              icon={Upload}
+              title="Upload your policy"
+              desc="Drop a PDF or text file of your company's privacy policy. We extract and parse it into structured sections."
+            />
+            <Step
+              num="02"
+              icon={Search}
+              title="Semantic comparison"
+              desc="Each section is embedded into a 384-dimensional vector and compared against PIPEDA obligations using cosine similarity."
+            />
+            <Step
+              num="03"
+              icon={CheckCircle}
+              title="Get gap report"
+              desc="See which regulations you cover, where you fall short, and exactly which sections need work — with similarity scores."
+            />
           </div>
         </div>
       </section>
 
-      {/* Enterprise Assurance Section */}
-      <section className="relative z-10 py-24 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full">
-        <div className="bg-gray-900/30 border border-gray-800 rounded-2xl p-8 md:p-12">
-          <div className="space-y-6 max-w-4xl mx-auto">
-            <div className="flex items-center gap-3 text-green-500 mb-2">
-              <ShieldCheck className="w-6 h-6" />
-              <span className="font-mono text-sm font-bold tracking-wider uppercase">System Integrity</span>
-            </div>
-            <h2 className="text-3xl font-bold text-white">
-              Built for Regulatory Complexity
+      {/* Demo Stats */}
+      <section className="relative z-10 max-w-6xl mx-auto px-6 py-20">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <DemoCard
+            company="Apex Financial Group"
+            score={78.7}
+            color="green"
+            label="Compliant policy"
+            note="Comprehensive coverage of all 10 fair information principles"
+          />
+          <DemoCard
+            company="NorthStar Banking"
+            score={24.6}
+            color="amber"
+            label="Mixed compliance"
+            note="Missing breach notification, weak on accountability"
+          />
+          <DemoCard
+            company="QuickLend Inc."
+            score={8.2}
+            color="red"
+            label="Non-compliant"
+            note="Bare minimum policy missing critical obligations"
+          />
+        </div>
+        <p className="text-center text-xs text-gray-600 font-mono mt-6">
+          Real results from running our 3 sample policies against PIPEDA
+        </p>
+      </section>
+
+      {/* Tech */}
+      <section className="relative z-10 py-20 border-y border-gray-900 bg-black/40">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <span className="text-xs text-green-500 font-mono uppercase tracking-wider">Built on real infrastructure</span>
+            <h2 className="text-3xl md:text-4xl font-bold text-white mt-3">
+              Not another AI wrapper
             </h2>
-            <p className="text-gray-400 leading-relaxed text-lg">
-              We've moved beyond keyword search and AI wrappers. Covenant Systems uses <span className="text-green-400 font-semibold">GraphRAG architecture</span>—combining Knowledge Graphs with LLMs to understand regulatory relationships, trace compliance impacts across jurisdictions, and surface hidden dependencies that traditional systems miss.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6">
-              <div className="flex flex-col gap-1 p-3 bg-gray-900/50 border border-gray-800 rounded">
-                <div className="flex items-center gap-2 text-sm text-green-500 font-mono font-bold">
-                  <Network className="w-4 h-4" />
-                  <span>Graph-Native Intelligence</span>
-                </div>
-                <span className="text-xs text-gray-500">Maps 10,000+ regulatory relationships</span>
-              </div>
-              <div className="flex flex-col gap-1 p-3 bg-gray-900/50 border border-gray-800 rounded">
-                <div className="flex items-center gap-2 text-sm text-green-500 font-mono font-bold">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Citation-Required Reasoning</span>
-                </div>
-                <span className="text-xs text-gray-500">Every answer traceable to source documents</span>
-              </div>
-              <div className="flex flex-col gap-1 p-3 bg-gray-900/50 border border-gray-800 rounded">
-                <div className="flex items-center gap-2 text-sm text-green-500 font-mono font-bold">
-                  <Lock className="w-4 h-4" />
-                  <span>Zero Hallucination Tolerance</span>
-                </div>
-                <span className="text-xs text-gray-500">Confidence scoring on all AI outputs</span>
-              </div>
-            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Feature
+              icon={FileText}
+              title="22,000+ sections"
+              desc="Bronze/Silver/Gold pipeline with hierarchical segmentation across 9 documents"
+            />
+            <Feature
+              icon={GitBranch}
+              title="Knowledge Graph"
+              desc="509 nodes, 121 edges mapping cross-references between regulations"
+            />
+            <Feature
+              icon={Zap}
+              title="Sub-second search"
+              desc="FAISS vector index with cosine similarity. No API calls, no latency"
+            />
+            <Feature
+              icon={Lock}
+              title="Auditable"
+              desc="Every match has a similarity score. Every classification cites source text"
+            />
           </div>
         </div>
       </section>
 
-      {/* Footer CTA */}
-      <footer className="relative z-10 py-20 border-t border-gray-900 bg-black">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold text-white mb-8">
-            Join the Command Line.
-          </h2>
-          <CTAForm />
-          <div className="mt-12 text-xs text-gray-600 font-mono">
-            <p>© 2025 Covenant Systems. All systems operational.</p>
+      {/* CTA */}
+      <section className="relative z-10 py-24 px-6 text-center">
+        <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+          Stop guessing about compliance.
+        </h2>
+        <p className="text-gray-400 mb-8 max-w-xl mx-auto">
+          Get an honest, scored breakdown of where your policy stands against Canadian privacy law.
+        </p>
+        <Link
+          href="/dashboard"
+          className="group inline-flex items-center gap-2 px-8 py-4 bg-green-500 text-black font-mono font-bold rounded-lg hover:bg-green-400 transition-all"
+        >
+          Run your first analysis
+          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+        </Link>
+      </section>
+
+      {/* Footer */}
+      <footer className="relative z-10 border-t border-gray-900 py-10 px-6">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-gray-600 text-xs font-mono">
+            <ShieldCheck className="w-4 h-4 text-green-500" />
+            Covenant Systems © 2026
+          </div>
+          <div className="flex gap-6 text-xs text-gray-600 font-mono">
+            <Link href="/dashboard" className="hover:text-green-500 transition-colors">Dashboard</Link>
+            <Link href="/sign-in" className="hover:text-green-500 transition-colors">Sign in</Link>
+            <a href="https://github.com/Bensonn5151/covenant_systems" target="_blank" rel="noreferrer" className="hover:text-green-500 transition-colors">GitHub</a>
           </div>
         </div>
       </footer>
     </main>
+  );
+}
+
+function Step({ num, icon: Icon, title, desc }: { num: string; icon: typeof Upload; title: string; desc: string }) {
+  return (
+    <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-6 hover:border-green-500/30 transition-colors">
+      <div className="flex items-center justify-between mb-5">
+        <div className="w-10 h-10 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-center">
+          <Icon className="w-5 h-5 text-green-400" />
+        </div>
+        <span className="text-xs font-mono text-gray-700">{num}</span>
+      </div>
+      <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
+      <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
+    </div>
+  );
+}
+
+function DemoCard({ company, score, color, label, note }: { company: string; score: number; color: 'green' | 'amber' | 'red'; label: string; note: string }) {
+  const colors = {
+    green: 'text-green-400 border-green-500/30 bg-green-500/5',
+    amber: 'text-amber-400 border-amber-500/30 bg-amber-500/5',
+    red: 'text-red-400 border-red-500/30 bg-red-500/5',
+  };
+  return (
+    <div className={`rounded-xl p-6 border ${colors[color]}`}>
+      <div className="text-xs font-mono uppercase opacity-70 mb-2">{label}</div>
+      <div className="flex items-baseline gap-2 mb-3">
+        <span className={`text-4xl font-bold ${colors[color].split(' ')[0]}`}>{score}%</span>
+        <span className="text-xs text-gray-500">compliance</span>
+      </div>
+      <div className="text-sm font-medium text-white mb-1">{company}</div>
+      <div className="text-xs text-gray-500">{note}</div>
+    </div>
+  );
+}
+
+function Feature({ icon: Icon, title, desc }: { icon: typeof Upload; title: string; desc: string }) {
+  return (
+    <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
+      <Icon className="w-5 h-5 text-green-500 mb-3" />
+      <h3 className="text-sm font-bold text-white mb-1">{title}</h3>
+      <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
+    </div>
   );
 }
