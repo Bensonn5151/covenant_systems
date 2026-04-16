@@ -60,6 +60,14 @@ def compute_residual_risk(severity_signal: Optional[str], coverage_status: str) 
 # ── Loaders ──────────────────────────────────────────────────────────────────
 
 def load_regulation_sections(regulation_id: str) -> List[Dict]:
+    """Load regulation sections — from Supabase if DATABASE_URL is set, else JSON files."""
+    if os.environ.get("DATABASE_URL"):
+        from api.fastapi.db import get_regulation_sections
+        sections = get_regulation_sections(regulation_id)
+        if not sections:
+            raise FileNotFoundError(f"Regulation not found: {regulation_id}")
+        return sections
+    # Fallback to file-based
     sections_file = STORAGE / "gold" / regulation_id / "sections.json"
     if not sections_file.exists():
         raise FileNotFoundError(f"Regulation not found: {regulation_id}")
@@ -70,8 +78,14 @@ def load_regulation_sections(regulation_id: str) -> List[Dict]:
 def get_obligation_sections(sections: List[Dict]) -> List[Dict]:
     results = []
     for s in sections:
+        # DB rows have classification as a string; JSON rows have it as a dict
         cls = s.get("classification", {})
-        label = cls.get("label", "") if isinstance(cls, dict) else ""
+        if isinstance(cls, str):
+            label = cls
+        elif isinstance(cls, dict):
+            label = cls.get("label", "")
+        else:
+            label = ""
         if label in ("obligation", "prohibition"):
             results.append(s)
     return results
@@ -112,8 +126,8 @@ def _build_user_prompt(policy_text: str, obligations: List[Dict]) -> str:
         sid = ob.get("section_id", f"ob-{i}")
         title = ob.get("title", "")
         body = ob.get("body", "")[:400]
-        cls = ob.get("classification", {})
-        label = cls.get("label", "obligation") if isinstance(cls, dict) else "obligation"
+        cls = ob.get("classification", "obligation")
+        label = cls.get("label", "obligation") if isinstance(cls, dict) else cls if isinstance(cls, str) else "obligation"
         ob_lines.append(f'[{sid}] ({label}) {title}\n{body}')
 
     obligations_text = "\n\n".join(ob_lines)

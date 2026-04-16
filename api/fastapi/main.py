@@ -714,8 +714,12 @@ def _build_multi_comparison(policy_sections: list, policy_id: str, threshold: fl
     Uses Groq LLM for direct reasoning (no embeddings). Falls back to
     embedding-based comparison if GROQ_API_KEY is not set.
     """
-    # Discover available regulations
-    available_regs = {f.parent.name for f in STORAGE.glob("gold/*/sections.json")}
+    # Discover available regulations — DB first, fallback to files
+    if os.environ.get("DATABASE_URL"):
+        from api.fastapi.db import list_regulation_ids
+        available_regs = set(list_regulation_ids())
+    else:
+        available_regs = {f.parent.name for f in STORAGE.glob("gold/*/sections.json")}
     regulations = [r for r in _REGULATION_ORDER if r in available_regs]
     for r in sorted(available_regs):
         if r not in regulations:
