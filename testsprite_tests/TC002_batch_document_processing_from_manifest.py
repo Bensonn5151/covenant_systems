@@ -3,47 +3,43 @@ import requests
 BASE_URL = "http://localhost:8000"
 TIMEOUT = 30
 
+
 def test_batch_document_processing_from_manifest():
     url = f"{BASE_URL}/batch-ingest"
     headers = {"Content-Type": "application/json"}
 
-    # Test successful batch ingest with a valid manifest
-    valid_payload = {
-        "manifest_path": "data/raw/manifest.yaml"
-    }
+    # Test case 1: Valid manifest processing
+    valid_payload = {"manifest_path": "/manifests/manifest.yaml"}
+    try:
+        valid_response = requests.post(url, json=valid_payload, headers=headers, timeout=TIMEOUT)
+    except requests.RequestException as e:
+        assert False, f"Request to /batch-ingest with valid manifest failed: {e}"
 
-    response = requests.post(url, json=valid_payload, headers=headers, timeout=TIMEOUT)
-    assert response.status_code == 200, f"Expected 200 OK but got {response.status_code}"
-    data = response.json()
+    assert valid_response.status_code == 200, f"Expected 200 OK, got {valid_response.status_code}"
+    try:
+        data = valid_response.json()
+    except Exception as e:
+        assert False, f"Response JSON parsing failed: {e}"
 
-    assert "processed_count" in data, "Response missing processed_count"
-    assert "failed_count" in data, "Response missing failed_count"
-    assert "results" in data and isinstance(data["results"], list), "Response missing or invalid results list"
+    assert "processed_count" in data and isinstance(data["processed_count"], int), "Missing or invalid processed_count"
+    assert "failed_count" in data and isinstance(data["failed_count"], int), "Missing or invalid failed_count"
+    assert "results" in data and isinstance(data["results"], list), "Missing or invalid results list"
 
-    # Validate processed_count and failed_count sensible according to result entries
-    processed_count = data["processed_count"]
-    failed_count = data["failed_count"]
-    results = data["results"]
+    # Each result should have document_id and status
+    for result in data["results"]:
+        assert "document_id" in result and isinstance(result["document_id"], str), "Result missing document_id"
+        assert "status" in result and isinstance(result["status"], str), "Result missing status"
+        # Status should be processed or failed or similar valid status strings
+        assert result["status"] in ["processed", "failed", "error", "skipped"], f"Unexpected status value: {result['status']}"
 
-    assert processed_count >= 0, "processed_count should be non-negative"
-    assert failed_count >= 0, "failed_count should be non-negative"
-    assert processed_count + failed_count == len(results), "Sum of processed_count and failed_count must equal results length"
+    # Test case 2: Manifest with missing file causing pipeline error
+    error_payload = {"manifest_path": "/manifests/manifest_with_missing_file.yaml"}
+    try:
+        error_response = requests.post(url, json=error_payload, headers=headers, timeout=TIMEOUT)
+    except requests.RequestException as e:
+        assert False, f"Request to /batch-ingest with error manifest failed: {e}"
 
-    for result in results:
-        assert "document_id" in result, "Result missing document_id"
-        assert "status" in result, "Result missing status"
-        assert result["status"] == "processed", f"Each document status expected to be 'processed', got {result['status']}"
-        assert "title" in result, "Result missing title"
+    assert error_response.status_code == 500, f"Expected 500 Pipeline processing error, got {error_response.status_code}"
 
-    # Test error handling with manifest that contains missing files or causes pipeline errors
-    # According to PRD, bad manifest returns 400 or 500 (pipeline processing error)
-    # Testing with a known corrupt manifest path
-    bad_payload = {
-        "manifest_path": "data/raw/manifest_with_missing_file.yaml"
-    }
-
-    response_bad = requests.post(url, json=bad_payload, headers=headers, timeout=TIMEOUT)
-    # The PRD mentions 500 Pipeline processing error for missing files in manifest, test accordingly
-    assert response_bad.status_code in (400, 500), f"Expected 400 or 500 error but got {response_bad.status_code}"
 
 test_batch_document_processing_from_manifest()

@@ -1,42 +1,52 @@
 [
   {
     "id": "TC001",
-    "title": "ingest_pdf_document_pipeline",
-    "description": "Test the POST /ingest endpoint to verify processing a single PDF document through the full Bronze-Silver-Gold pipeline, including handling bilingual documents, correct metadata inference, section segmentation, and embedding generation. Validate successful response with document_id, sections_count, and status. Also test error handling for invalid PDF or missing parameters."
+    "title": "health check endpoint returns_system_status_and_document_counts",
+    "description": "Verify that GET /health returns HTTP 200 with a JSON body containing status, timestamp, and document counts for bronze, silver, and gold layers when the system is healthy."
   },
   {
     "id": "TC002",
-    "title": "batch_document_processing_from_manifest",
-    "description": "Test the POST /batch-ingest endpoint to process multiple documents defined in a YAML manifest with dependency ordering. Verify that the pipeline runs for each document and returns processed_count, failed_count, and per-document results. Also test error handling when manifest contains missing files or causes pipeline errors."
+    "title": "regulations_api_lists_all_regulations_with_classification_and_severity",
+    "description": "Verify that GET /api/regulations returns HTTP 200 with a list of regulations including fields id, document_type, jurisdiction, regulator, total_sections, obligations_count, prohibitions_count, definitions_count, and severity_signal_breakdown."
   },
   {
     "id": "TC003",
-    "title": "legislation_discovery_and_download",
-    "description": "Test the POST /discover endpoint to discover and download legislation by act name or slug. Verify successful discovery returns discovered_count and manifest_entries with correct source URLs and saved paths. Also test handling of nonexistent acts returning 404 error."
+    "title": "dashboard_documents_endpoint_returns_regulation_tile_data",
+    "description": "Verify that GET /api/dashboard/documents returns HTTP 200 with documents array containing document_id, document_type, jurisdiction, regulator, section_count, classification_breakdown, and severity_signal_breakdown, along with total count."
   },
   {
     "id": "TC004",
-    "title": "semantic_search_over_gold_embeddings",
-    "description": "Test the GET /search endpoint to perform FAISS-powered semantic similarity search over Gold-layer section embeddings. Verify that queries return top-K relevant sections with section_id, title, body, score, and document. Also test error handling when the index is not loaded returning 500 error."
+    "title": "dashboard_document_detail_returns_section_level_information_or_404",
+    "description": "Verify that GET /api/dashboard/documents/{document_id} returns HTTP 200 with section-level details for a valid document_id (e.g., 'pipeda'), and returns HTTP 404 with error message when document_id is unknown."
   },
   {
     "id": "TC005",
-    "title": "knowledge_graph_building_from_manifest",
-    "description": "Test the POST /build-kg endpoint to build and maintain a YAML-based regulatory knowledge graph from manifest relationships. Verify successful response includes nodes_count and edges_count. Also test error handling for corrupt manifests causing KG build errors."
+    "title": "dashboard_stats_endpoint_returns_aggregate_metrics",
+    "description": "Verify that GET /api/dashboard/stats returns HTTP 200 with aggregated metrics including total_sections, total_documents, classifications, severity_signals, operational_areas, and punitive_obligations."
   },
   {
     "id": "TC006",
-    "title": "data_validation_checks",
-    "description": "Test the GET /validate endpoint to run validation checks on manifest integrity and Bronze/Silver/Gold schema compliance. Verify response includes valid boolean, errors array, and warnings array. Also test handling of validation service unavailability returning 500 error."
+    "title": "sample_policies_list_and_retrieve_specific_policy",
+    "description": "Verify that GET /api/sample-policies returns HTTP 200 with a list of sample policies, and GET /api/sample-policies/{policy_id} returns HTTP 200 with policy details for valid policy_id (e.g., 'quicklend_privacy_notice') or HTTP 404 for nonexistent policy."
   },
   {
     "id": "TC007",
-    "title": "email_signup_submission",
-    "description": "Test the POST /api/submit-email endpoint to submit emails for waitlist signup. Verify successful submission returns success true. Test validation error response for invalid email formats and server error handling."
+    "title": "single_regulation_comparison_returns_comparison_results_or_errors",
+    "description": "Verify that POST /api/compare with valid sample_policy_id and regulation_id returns HTTP 200 with comparison results including score, covered, gaps, partial, matches, and details; returns HTTP 404 if policy or regulation not found; returns HTTP 400 if no policy_text or sample_policy_id provided."
   },
   {
     "id": "TC008",
-    "title": "web_scraping_regulatory_content",
-    "description": "Test the POST /scrape endpoint to scrape regulatory content from configured sources like FINTRAC and OPC. Verify successful scraping returns pages_scraped count and list of files_saved. Also test error handling for unsupported sources returning scraping errors."
+    "title": "multi_regulation_comparison_returns_heatmap_or_errors",
+    "description": "Verify that POST /api/compare-all with valid sample_policy_id or policy_text returns HTTP 200 with heatmap, summary, and details; returns HTTP 400 if no sections found."
+  },
+  {
+    "id": "TC009",
+    "title": "semantic_search_returns_relevant_results_or_error",
+    "description": "Verify that GET /search with query parameter returns HTTP 200 with search results including section_id, title, body, score, and document; returns HTTP 500 with error if FAISS index is not found."
+  },
+  {
+    "id": "TC010",
+    "title": "data_validation_endpoint_reports_integrity_status",
+    "description": "Verify that GET /validate returns HTTP 200 with validation results indicating valid status, errors, and warnings; handles error cases gracefully."
   }
 ]

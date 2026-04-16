@@ -1,206 +1,175 @@
 version: "2"
 type: backend
 tech_stack:
-  - python
-  - fastapi
-  - next.js
-  - faiss
-  - pydantic
+  - Python 3.10
+  - FastAPI
+  - Supabase Postgres
+  - Groq LLM (Llama 3.3 70B)
   - sentence-transformers
-  - streamlit
-  - pdfplumber
-  - pypdf2
-  - tesseract-ocr
-  - adobe-pdf-services
-  - yaml
+  - FAISS
+  - Clerk Auth (frontend)
+  - Next.js 16 (frontend)
 features:
-  - name: Document Ingestion Pipeline
-    description: Full Bronze-Silver-Gold pipeline for regulatory PDF ingestion, extraction, segmentation, and enrichment
+  - name: Health Check
+    description: System health and document layer counts
     files:
-      - ingestion/pipeline.py
-      - ingestion/schemas.py
-      - ingestion/extract/pdf_extractor.py
-      - ingestion/extract/adobe_pdf_extractor.py
-      - ingestion/extract/bilingual_extractor.py
-      - ingestion/segment/advanced_segmenter.py
-      - ingestion/segment/section_segmenter.py
-      - ingestion/segment/bookmark_segmenter.py
-      - ingestion/classify/document_classifier.py
-      - ingestion/classify/section_classifier.py
-      - ingestion/classify/risk_scorer.py
-      - ingestion/classify/cross_reference.py
-      - ingestion/embed/embedder.py
-      - ingestion/ocr/ocr_processor.py
-      - ingestion/preprocessors/language_filter.py
+      - api/fastapi/main.py
     endpoints:
-      - method: POST
-        path: /ingest
-        description: "Process a PDF document through the full Bronze-Silver-Gold pipeline. IMPORTANT: Use pdf_path 'data/raw/acts/R.S.C., 1985, c. P-21 - Privacy Act.pdf' for testing (this file exists). Status field returns 'processed' on success."
+      - method: GET
+        path: /health
+        description: Health check with Bronze/Silver/Gold layer counts
         auth_required: false
-        request_schema:
-          body:
-            pdf_path: "string (relative path from project root, e.g. 'data/raw/acts/R.S.C., 1985, c. P-21 - Privacy Act.pdf')"
-            document_type: string
-            jurisdiction: string
-            is_bilingual: boolean
         response_schema:
-          "200": "{ document_id: string, sections_count: int, status: 'processed', extraction_method: string }"
-          "400": "PDF not found"
-          "422": "Missing required field pdf_path"
+          "200": "{status, timestamp, documents: {bronze, silver, gold}}"
     depends_on: []
 
-  - name: Batch Document Processing
-    description: Batch ingestion of multiple documents from a YAML manifest with dependency ordering
+  - name: Regulations API
+    description: List and browse regulatory documents and their sections from Supabase
     files:
-      - batch_ingest.py
-      - bronze_to_silver.py
-      - gold_builder.py
-      - generate_embeddings.py
+      - api/fastapi/main.py
+      - api/fastapi/db.py
+    endpoints:
+      - method: GET
+        path: /api/regulations
+        description: List all regulations with classification and severity breakdown
+        auth_required: false
+        response_schema:
+          "200": "{regulations: [{id, document_type, jurisdiction, regulator, total_sections, obligations_count, prohibitions_count, definitions_count, severity_signal_breakdown}]}"
+      - method: GET
+        path: /api/dashboard/documents
+        description: Regulation tile data for dashboard (no risk fields)
+        auth_required: false
+        response_schema:
+          "200": "{documents: [{document_id, document_type, jurisdiction, regulator, section_count, classification_breakdown, severity_signal_breakdown}], total}"
+      - method: GET
+        path: /api/dashboard/documents/{document_id}
+        description: Section-level detail for a regulation. Use document_id 'pipeda' for testing.
+        auth_required: false
+        response_schema:
+          "200": "{document_id, sections: [{section_id, title, body, classification, severity_signal, operational_areas}], total_sections}"
+          "404": "Document not found"
+    depends_on: []
+
+  - name: Dashboard Stats
+    description: Aggregate statistics across all regulation sections
+    files:
+      - api/fastapi/main.py
+    endpoints:
+      - method: GET
+        path: /api/dashboard/stats
+        description: Classification and severity signal breakdown across all documents
+        auth_required: false
+        response_schema:
+          "200": "{total_sections, total_documents, classifications, severity_signals, operational_areas, punitive_obligations}"
+    depends_on: []
+
+  - name: Sample Policies
+    description: List and retrieve bundled sample policy documents for testing
+    files:
+      - api/fastapi/main.py
+    endpoints:
+      - method: GET
+        path: /api/sample-policies
+        description: List available sample policies
+        auth_required: false
+        response_schema:
+          "200": "{policies: [{id, name, filename, sections_count}]}"
+      - method: GET
+        path: /api/sample-policies/{policy_id}
+        description: Get a specific sample policy with sections. Use 'quicklend_privacy_notice' for testing.
+        auth_required: false
+        response_schema:
+          "200": "{policy_name, filename, sections, raw_text}"
+          "404": "Sample policy not found"
+    depends_on: []
+
+  - name: Single Regulation Comparison
+    description: Compare a policy against one regulation using LLM reasoning or embeddings
+    files:
+      - api/fastapi/main.py
+      - api/fastapi/compare.py
+      - api/fastapi/llm_compare.py
     endpoints:
       - method: POST
-        path: /batch-ingest
-        description: Process all documents in manifest.yaml through the pipeline
+        path: /api/compare
+        description: Compare policy against a single regulation. Use sample_policy_id 'quicklend_privacy_notice' and regulation_id 'pipeda' for testing.
         auth_required: false
         request_schema:
           body:
-            manifest_path: string
+            sample_policy_id: string (optional)
+            policy_text: string (optional)
+            regulation_id: string
+            threshold: number
         response_schema:
-          "200": "{ processed_count, failed_count, results[] }"
-          "500": "Pipeline processing error"
+          "200": "{score, total_obligations, covered, gaps, partial, matches, gap_details, partial_details, coverage_by_area}"
+          "400": "No sections found"
+          "404": "Policy or regulation not found"
     depends_on:
-      - Document Ingestion Pipeline
+      - Regulations API
+      - Sample Policies
 
-  - name: Legislation Discovery & Mapping
-    description: Discover and download Canadian legislation from laws-lois.justice.gc.ca
+  - name: Multi-Regulation Comparison (Heatmap)
+    description: Compare a policy against ALL 9 regulations and return a risk heatmap grid
     files:
-      - run_mapper.py
-      - run_mapper_from_config.py
-      - ingestion/mapper/justice_client.py
-      - ingestion/mapper/downloader.py
-      - ingestion/mapper/manifest_generator.py
-      - ingestion/mapper/metadata_parser.py
+      - api/fastapi/main.py
+      - api/fastapi/llm_compare.py
+      - api/fastapi/db.py
     endpoints:
       - method: POST
-        path: /discover
-        description: "Search manifest for legislation. IMPORTANT: Use acts=['Privacy Act'] for testing (exists in manifest). Returns 404 when no match found. Matching is case-insensitive substring on title field."
+        path: /api/compare-all
+        description: Run policy against all regulations. Returns heatmap (8 areas x 9 regs). Use sample_policy_id 'quicklend_privacy_notice' for testing. Takes 2-3 minutes with LLM.
         auth_required: false
         request_schema:
           body:
-            acts: "string[] (use full act names like 'Privacy Act' or 'Proceeds of Crime')"
+            sample_policy_id: string (optional)
+            policy_text: string (optional)
+            threshold: number
         response_schema:
-          "200": "{ discovered_count: int, manifest_entries: [{ document_id, title, act, category, source_url, saved_path }] }"
-          "404": "Act not found (when no matches)"
-    depends_on: []
+          "200": "{policy_id, evaluated_at, regulations[], operational_areas[], heatmap, summary, details}"
+          "400": "No sections found"
+    depends_on:
+      - Regulations API
 
   - name: Semantic Search
-    description: FAISS-powered semantic similarity search over Gold layer embeddings
+    description: FAISS-powered semantic similarity search over regulation embeddings
     files:
+      - api/fastapi/main.py
       - search/semantic_search.py
-      - storage/vector_db/faiss_manager.py
-      - ingestion/embed/embedder.py
-      - test_search.py
     endpoints:
       - method: GET
         path: /search
-        description: "Search regulatory sections by natural language query. FAISS index is always loaded. Parameters are query params (not body). Use query='money laundering requirements' for testing. Scores are floats between 0.0 and 1.0. The index always returns results for valid queries."
+        description: Semantic search. Use query 'breach notification requirements' for testing.
         auth_required: false
         request_schema:
           query_params:
-            query: "string (required)"
-            top_k: "int (default 5)"
-            category: "string (optional, e.g. 'act', 'regulation', 'guidance')"
+            query: string (required)
+            top_k: int (default 5)
+            category: string (optional)
         response_schema:
-          "200": "{ results: [{ section_id: string, title: string, body: string, score: float(0-1), document: string }], query: string, count: int }"
-          "500": "Only if FAISS index file is missing from disk"
-    depends_on:
-      - Document Ingestion Pipeline
-
-  - name: Knowledge Graph Builder
-    description: Build and maintain YAML-based regulatory knowledge graph with nodes and edges
-    files:
-      - build_kg_from_manifest.py
-      - storage/knowledge_graph/nodes.yaml
-      - storage/knowledge_graph/edges.yaml
-      - storage/knowledge_graph/domains.yaml
-      - configs/kg_ontology.yaml
-    endpoints:
-      - method: POST
-        path: /build-kg
-        description: Build knowledge graph from manifest relationships
-        auth_required: false
-        request_schema:
-          body:
-            manifest_path: string
-        response_schema:
-          "200": "{ nodes_count, edges_count }"
-          "500": "KG build error"
-    depends_on:
-      - Document Ingestion Pipeline
+          "200": "{results: [{section_id, title, body, score, document}], query, count}"
+          "500": "FAISS index not found"
+    depends_on: []
 
   - name: Data Validation
-    description: Validate manifest integrity and Bronze/Silver/Gold schema compliance
+    description: Validate storage layer integrity
     files:
-      - validate_data.py
-      - validate_manifest.py
-      - fix_manifest_parent_acts.py
-      - restore_manifest.py
+      - api/fastapi/main.py
     endpoints:
       - method: GET
         path: /validate
-        description: Run validation checks on storage layers and manifest
+        description: Run validation checks on Bronze/Silver/Gold layers
         auth_required: false
         response_schema:
-          "200": "{ valid: boolean, errors[], warnings[] }"
-    depends_on: []
-
-  - name: Email Signup API
-    description: Email submission endpoint with Notion database integration
-    files:
-      - web/src/app/api/submit-email/route.ts
-      - web/src/components/CTAForm.tsx
-    endpoints:
-      - method: POST
-        path: /api/submit-email
-        description: Submit email for waitlist signup, stores in Notion
-        auth_required: false
-        request_schema:
-          body:
-            email: string
-        response_schema:
-          "200": "{ success: true }"
-          "400": "Validation error"
-          "500": "Server error"
-    depends_on: []
-
-  - name: Web Scraping
-    description: Scrape regulatory content from FINTRAC and OPC websites
-    files:
-      - scrape_fintrac.py
-      - scrape_opc.py
-      - convert_html_to_pdf.py
-    endpoints:
-      - method: POST
-        path: /scrape
-        description: Scrape regulatory content from specified source
-        auth_required: false
-        request_schema:
-          body:
-            source: string
-        response_schema:
-          "200": "{ pages_scraped, files_saved[] }"
-          "500": "Scraping error"
+          "200": "{valid: boolean, errors[], warnings[]}"
     depends_on: []
 
 known_limitations:
-  - issue: FastAPI routes are empty stubs - no HTTP server is implemented yet
-    location: api/fastapi/routes/__init__.py
-    impact: Backend features are only accessible via CLI scripts, not HTTP endpoints
-  - issue: AI reasoning modules are placeholder stubs
-    location: ai/
-    impact: No LLM-powered reasoning, agents, or evaluation available yet
-  - issue: PostgreSQL integration not implemented
-    location: storage/postgres/
-    impact: All data stored as flat files (JSON, YAML, NumPy) instead of relational DB
-  - issue: No authentication or authorization
-    location: api/
-    impact: All endpoints and scripts are unauthenticated
+  - issue: Multi-regulation comparison takes 2-3 minutes on Groq free tier due to rate limits
+    location: api/fastapi/llm_compare.py
+    impact: Users must wait with no progress indicator
+  - issue: No auth enforcement on API endpoints (auth is frontend-only via Clerk)
+    location: api/fastapi/main.py
+    impact: API endpoints are publicly accessible
+  - issue: Render free tier sleeps after 15 min inactivity (50s cold start)
+    location: Dockerfile
+    impact: First request after sleep is slow
