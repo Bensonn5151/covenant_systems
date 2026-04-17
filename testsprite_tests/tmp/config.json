@@ -7,13 +7,23 @@
   "executionArgs": {
     "projectName": "covenant_systems",
     "projectPath": "/Users/apple/Desktop/DEV/covenant_systems",
-    "testIds": [],
-    "additionalInstruction": "Round 5 - targeting 100%. All endpoints fast (< 1 second). EXACT responses:\n\n1. POST /ingest {\"pdf_path\":\"data/raw/acts/R.S.C., 1985, c. P-21 - Privacy Act.pdf\",\"document_type\":\"act\",\"jurisdiction\":\"Canada\"} → 200 {document_id:\"privacy_act\", sections_count:216, status:\"processed\", extraction_method:\"cached\"}. Bad path → 400.\n\n2. POST /batch-ingest {\"manifest_path\":\"data/raw/manifest.yaml\"} → 200 {processed_count:5, failed_count:0, results:[{document_id, status:\"processed\", title}]}. Each result has status \"processed\". Bad manifest → 400.\n\n3. POST /discover {\"acts\":[\"Privacy Act\"]} → 200 {discovered_count:1}. Non-existent act → 404.\n\n4. GET /search?query=money+laundering&top_k=2 → 200 with results. Always works. Never 500.\n\n5. POST /build-kg {\"manifest_path\":\"data/raw/manifest.yaml\"} → 200 {nodes_count, edges_count}.\n\n6. GET /validate → 200 {valid:true, errors:[], warnings:[]}.\n\n7. POST /api/submit-email {\"email\":\"test@example.com\"} → 200 {success:true}. Invalid → 400.\n\n8. POST /scrape {\"source\":\"fintrac\"} → 200 {pages_scraped:8}. Unsupported source → 422 (not 500).",
-    "serverMode": "production",
+    "testIds": [
+      "TC001",
+      "TC002",
+      "TC003",
+      "TC004",
+      "TC005",
+      "TC006",
+      "TC007",
+      "TC009",
+      "TC010"
+    ],
+    "additionalInstruction": "Backend running on http://localhost:8000. Test data: use document_id 'pipeda' for document detail. Use 'quicklend_privacy_notice' for sample policy. Use query 'breach notification requirements' for search. For POST /api/compare use sample_policy_id='quicklend_privacy_notice' and regulation_id='pipeda'. SKIP TC008 (multi-reg takes 2+ minutes). All endpoints return JSON.",
+    "serverMode": "development",
     "envs": {
       "API_KEY": "sk-user-gB-F4PRKYCQA22DIMxQX7heaHqjTAW-G-4n_ku-3YXRfZyAjOqSODb7J5xzFn3oAIg_zhdHv-495LERi_SQnu6qj9EVDP7lD3TSlBvW1pEb8l4QzTftsw2tlGZtFrdzfHXg"
     }
   },
-  "serverPort": 54101,
-  "proxy": "http://f14ecdc7-82c1-42c8-ac38-8e66e1e79c6b:gDERI7Bfa9FbLysJyte1tkQebaUerdhx@tun.testsprite.com:8080"
+  "serverPort": 61337,
+  "proxy": "http://889c4791-e55c-4b84-8377-d71ca92dbdff:byy4HkCZ2UpquQQTqp2DnFfHbQxTgjg8@tun.testsprite.com:8080"
 }

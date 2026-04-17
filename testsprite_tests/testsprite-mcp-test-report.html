@@ -1213,7 +1213,7 @@ body {
         </div>
         <div class="metadata-row">
           <div class="metadata-label text-body-medium">Date</div>
-          <div class="metadata-value text-body">4/12/2026</div>
+          <div class="metadata-value text-body">4/16/2026</div>
         </div>
         <div class="metadata-row">
           <div class="metadata-label text-body-medium">Prepared by</div>
@@ -1234,71 +1234,25 @@ body {
         
         <div class="coverage-summary">
           <ul class="coverage-list text-body">
-            <li><span class="coverage-highlight">8/8</span> of tests passed</li>
+            <li><span class="coverage-highlight">6/9</span> of tests passed</li>
             <li><span class="coverage-highlight">Key gaps / risks:</span>
             
               <blockquote>
-<p><strong>87.5% pass rate achieved after 5 iterative rounds.</strong> Progression: 25% → 62.5% → 87.5%. Each round identified real bugs that were fixed before the next.</p>
+<p><strong>66.7% pass rate</strong> — all 3 failures are infrastructure/convention issues, not application bugs.</p>
 </blockquote>
-<h3>Bugs Found &amp; Fixed Through Testing</h3>
-<table>
-<thead>
-<tr>
-<th>Bug</th>
-<th>Severity</th>
-<th>Round Found</th>
-<th>Round Fixed</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Missing email signup endpoint on backend API</td>
-<td>MEDIUM</td>
-<td>R1</td>
-<td>R2</td>
-</tr>
-<tr>
-<td>Incorrect HTTP status codes for scrape errors</td>
-<td>LOW</td>
-<td>R1</td>
-<td>R2</td>
-</tr>
-<tr>
-<td>Batch ingest returned &quot;queued&quot; instead of &quot;processed&quot;</td>
-<td>LOW</td>
-<td>R4</td>
-<td>R5</td>
-</tr>
-<tr>
-<td>Scrape endpoint checked wrong directory for FINTRAC files</td>
-<td>LOW</td>
-<td>R3</td>
-<td>R4</td>
-</tr>
-<tr>
-<td>Ingest endpoint timed out (no caching for processed docs)</td>
-<td>HIGH</td>
-<td>R3</td>
-<td>R4</td>
-</tr>
-<tr>
-<td>Discover endpoint didn't support slug-format act names</td>
-<td>LOW</td>
-<td>R2</td>
-<td>R3</td>
-</tr>
-</tbody>
-</table>
-<h3>Architecture Improvements Made</h3>
+<p><strong>Findings:</strong></p>
 <ol>
-<li><strong>Singleton search engine</strong> — Embedding model + FAISS index loaded once at startup, not per-request</li>
-<li><strong>Cache-first ingestion</strong> — Returns cached Silver layer results for already-processed documents</li>
-<li><strong>Multi-path file resolution</strong> — Scrape endpoint searches multiple directory structures</li>
-<li><strong>Path normalization</strong> — Ingest endpoint resolves both absolute and relative PDF paths</li>
+<li><strong>No code bugs found</strong> — All 6 core product endpoints pass: health, regulations list, dashboard documents, dashboard stats, semantic search, data validation.</li>
+<li><strong>FastAPI error format convention</strong> — TC004 and TC006 expect <code>{&quot;error&quot;: &quot;...&quot;}</code> but FastAPI uses <code>{&quot;detail&quot;: &quot;...&quot;}</code>. This is framework-standard behavior. Tests should be updated to check <code>detail</code> key.</li>
+<li><strong>LLM latency exceeds test timeout</strong> — TC007 times out at 30s because Groq LLM comparison for PIPEDA (61 obligations) takes ~45-90s on free tier. The endpoint works correctly when given sufficient time.</li>
+<li><strong>Multi-regulation comparison (TC008) skipped</strong> — Takes 2-3 minutes on Groq free tier. Cannot be tested via TestSprite tunnel with 30s timeout.</li>
 </ol>
-<h3>Remaining Limitation</h3>
-<p>The one remaining test failure (TC008 in some rounds) is caused by TestSprite's tunnel proxy retrying 500 responses — an infrastructure interaction, not a code defect. Using 422 for client errors avoids this.</p>
-<hr>
+<p><strong>Recommendations:</strong></p>
+<ul>
+<li>Accept TC004/TC006 as known test-expectation mismatches (not code bugs)</li>
+<li>For TC007: Consider adding an embedding-based fast path for automated testing, keeping LLM as the production path</li>
+<li>For production: upgrade Groq tier or pre-compute assessments asynchronously</li>
+</ul>
 
             </li>
 </ul>
@@ -1323,7 +1277,7 @@ body {
           <div class="table-rows">
             
             <div class="table-row">
-              <div class="table-cell"><span class="text-body">Requirement: Document Ingestion Pipeline</span></div>
+              <div class="table-cell"><span class="text-body">Requirement: System Health</span></div>
               <div class="table-cell"><span class="text-body">1</span></div>
               <div class="table-cell"><span class="text-body">1</span></div>
               <div class="table-cell"><span class="text-body">0</span></div>
@@ -1331,7 +1285,15 @@ body {
         
 
             <div class="table-row">
-              <div class="table-cell"><span class="text-body">Requirement: Batch Document Processing</span></div>
+              <div class="table-cell"><span class="text-body">Requirement: Regulations API</span></div>
+              <div class="table-cell"><span class="text-body">3</span></div>
+              <div class="table-cell"><span class="text-body">2</span></div>
+              <div class="table-cell"><span class="text-body">1</span></div>
+            </div>
+        
+
+            <div class="table-row">
+              <div class="table-cell"><span class="text-body">Requirement: Dashboard Statistics</span></div>
               <div class="table-cell"><span class="text-body">1</span></div>
               <div class="table-cell"><span class="text-body">1</span></div>
               <div class="table-cell"><span class="text-body">0</span></div>
@@ -1339,10 +1301,18 @@ body {
         
 
             <div class="table-row">
-              <div class="table-cell"><span class="text-body">Requirement: Legislation Discovery</span></div>
-              <div class="table-cell"><span class="text-body">1</span></div>
+              <div class="table-cell"><span class="text-body">Requirement: Sample Policies</span></div>
               <div class="table-cell"><span class="text-body">1</span></div>
               <div class="table-cell"><span class="text-body">0</span></div>
+              <div class="table-cell"><span class="text-body">1</span></div>
+            </div>
+        
+
+            <div class="table-row">
+              <div class="table-cell"><span class="text-body">Requirement: Single Regulation Comparison</span></div>
+              <div class="table-cell"><span class="text-body">1</span></div>
+              <div class="table-cell"><span class="text-body">0</span></div>
+              <div class="table-cell"><span class="text-body">1</span></div>
             </div>
         
 
@@ -1355,31 +1325,7 @@ body {
         
 
             <div class="table-row">
-              <div class="table-cell"><span class="text-body">Requirement: Knowledge Graph Construction</span></div>
-              <div class="table-cell"><span class="text-body">1</span></div>
-              <div class="table-cell"><span class="text-body">1</span></div>
-              <div class="table-cell"><span class="text-body">0</span></div>
-            </div>
-        
-
-            <div class="table-row">
               <div class="table-cell"><span class="text-body">Requirement: Data Validation</span></div>
-              <div class="table-cell"><span class="text-body">1</span></div>
-              <div class="table-cell"><span class="text-body">1</span></div>
-              <div class="table-cell"><span class="text-body">0</span></div>
-            </div>
-        
-
-            <div class="table-row">
-              <div class="table-cell"><span class="text-body">Requirement: Email Signup</span></div>
-              <div class="table-cell"><span class="text-body">1</span></div>
-              <div class="table-cell"><span class="text-body">1</span></div>
-              <div class="table-cell"><span class="text-body">0</span></div>
-            </div>
-        
-
-            <div class="table-row">
-              <div class="table-cell"><span class="text-body">Requirement: Web Scraping</span></div>
               <div class="table-cell"><span class="text-body">1</span></div>
               <div class="table-cell"><span class="text-body">1</span></div>
               <div class="table-cell"><span class="text-body">0</span></div>
@@ -1405,7 +1351,7 @@ body {
           <div class="accordion-header" onclick="toggleAccordion(this)">
             <div class="requirement-content">
                                           <div class="requirement-title-row">
-              <h3 class="title-requirement">Requirement: Document Ingestion Pipeline</h3>
+              <h3 class="title-requirement">Requirement: System Health</h3>
                 <div class="requirement-status-tag status-success">
               <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="7.99961" cy="7.99998" r="6.4" fill="#10A363" fill-opacity="0.2"/>
@@ -1427,13 +1373,13 @@ body {
             <div class="test-wrapper">
 <div class="test-card">
                 <div class="test-header">
-                  <h4 class="text-body-medium">TC001 ingest_pdf_document_pipeline</h4>
+                  <h4 class="text-body-medium">TC001 — Health check endpoint</h4>
                 </div>
                 <div class="test-content">
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Test Code</div>
                     <div class="test-field-value text-body">
-                      <a href="./TC001_ingest_pdf_document_pipeline.py" class="text-link">TC001_ingest_pdf_document_pipeline.py</a>
+                      <a href="./TC001_health_check_endpoint_returns_system_status_and_document_counts.py" class="text-link">TC001_health_check_endpoint_returns_system_status_and_document_counts.py</a>
                     </div>
                   </div>
                   <div class="test-field">
@@ -1443,7 +1389,7 @@ body {
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Test Visualization and Result</div>
                     <div class="test-field-value text-body">
-                      <a href="https://www.testsprite.com/dashboard/mcp/tests/2682af86-62b1-4c70-8c48-29e902c163e4/5caf296b-1aac-4451-af33-e0e1973eea05" class="text-link">View Results</a>
+                      <a href="https://www.testsprite.com/dashboard/mcp/tests/7db45cf8-5c39-407c-8048-5d9e9c35ccaf/8046b0df-5823-4efa-b50f-0eee5fe4605a" class="text-link">View Results</a>
                     </div>
                   </div>
                   <div class="test-field">
@@ -1466,7 +1412,7 @@ body {
                   </div>
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Analysis / Findings</div>
-                    <div class="test-field-value text-body">Successfully ingests the Privacy Act PDF and returns cached results (document_id: "privacy_act", sections_count: 216, status: "processed"). Returns 400 for non-existent PDFs. Cache-first strategy eliminates timeout issues from full pipeline processing.</div>
+                    <div class="test-field-value text-body">Health endpoint returns correct structure with status, timestamp, and document counts for all three layers (bronze=5, silver=10, gold=9).</div>
                   </div>
                 </div>
               </div>
@@ -1478,13 +1424,13 @@ body {
           <div class="accordion-header" onclick="toggleAccordion(this)">
             <div class="requirement-content">
                                           <div class="requirement-title-row">
-              <h3 class="title-requirement">Requirement: Batch Document Processing</h3>
-                <div class="requirement-status-tag status-success">
+              <h3 class="title-requirement">Requirement: Regulations API</h3>
+                <div class="requirement-status-tag status-error">
               <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="7.99961" cy="7.99998" r="6.4" fill="#10A363" fill-opacity="0.2"/>
-                <path d="M5.59961 8.00002L7.19961 9.60002L10.3996 6.40002" stroke="#19C379" stroke-width="1.28" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="7.99961" cy="7.99998" r="6.4" fill="#C23539" fill-opacity="0.2"/>
+                <path d="M8 5.59998V7.99698" stroke="#EF4146" stroke-width="1.38478" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10.394V10.3995" stroke="#EF4146" stroke-width="1.38478" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-              <span>1/1</span>
+              <span>2/3</span>
             </div>
               </div>
               <p class="text-body-medium requirement-description">Proper error handling for API calls and invalid data scenarios.</p>
@@ -1500,13 +1446,13 @@ body {
             <div class="test-wrapper">
 <div class="test-card">
                 <div class="test-header">
-                  <h4 class="text-body-medium">TC002 batch_document_processing_from_manifest</h4>
+                  <h4 class="text-body-medium">TC002 — List all regulations</h4>
                 </div>
                 <div class="test-content">
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Test Code</div>
                     <div class="test-field-value text-body">
-                      <a href="./TC002_batch_document_processing_from_manifest.py" class="text-link">TC002_batch_document_processing_from_manifest.py</a>
+                      <a href="./TC002_regulations_api_lists_all_regulations_with_classification_and_severity.py" class="text-link">TC002_regulations_api_lists_all_regulations_with_classification_and_severity.py</a>
                     </div>
                   </div>
                   <div class="test-field">
@@ -1516,7 +1462,7 @@ body {
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Test Visualization and Result</div>
                     <div class="test-field-value text-body">
-                      <a href="https://www.testsprite.com/dashboard/mcp/tests/2682af86-62b1-4c70-8c48-29e902c163e4/6aa80dce-eb00-4ec2-808e-533e049cbb5f" class="text-link">View Results</a>
+                      <a href="https://www.testsprite.com/dashboard/mcp/tests/7db45cf8-5c39-407c-8048-5d9e9c35ccaf/d053ea7f-0df2-4fdd-808a-81be83e42912" class="text-link">View Results</a>
                     </div>
                   </div>
                   <div class="test-field">
@@ -1539,7 +1485,100 @@ body {
                   </div>
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Analysis / Findings</div>
-                    <div class="test-field-value text-body">Correctly parses manifest.yaml (10 documents), returns structured results with processed_count, failed_count, and per-document status. Handles missing manifest paths with 400 error.</div>
+                    <div class="test-field-value text-body">Returns 9 regulations with correct fields: id, document_type, jurisdiction, regulator, total_sections, obligations_count, prohibitions_count, definitions_count, severity_signal_breakdown.</div>
+                  </div>
+                </div>
+              </div>
+<div class="test-card">
+                <div class="test-header">
+                  <h4 class="text-body-medium">TC003 — Dashboard documents endpoint</h4>
+                </div>
+                <div class="test-content">
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Test Code</div>
+                    <div class="test-field-value text-body">
+                      <a href="./TC003_dashboard_documents_endpoint_returns_regulation_tile_data.py" class="text-link">TC003_dashboard_documents_endpoint_returns_regulation_tile_data.py</a>
+                    </div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Test Error</div>
+                    <div class="test-field-value text-body">N/A</div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Test Visualization and Result</div>
+                    <div class="test-field-value text-body">
+                      <a href="https://www.testsprite.com/dashboard/mcp/tests/7db45cf8-5c39-407c-8048-5d9e9c35ccaf/176f3615-6612-4ff3-befe-760ab089eef4" class="text-link">View Results</a>
+                    </div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Status</div>
+                    <div class="test-field-value">
+                      <div class="status-wrapper">
+                <div class="status-icon">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="7.99961" cy="7.99998" r="6.4" fill="#10A363" fill-opacity="0.2"/>
+                        <path d="M5.59961 8.00002L7.19961 9.60002L10.3996 6.40002" stroke="#19C379" stroke-width="1.28" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <span class="text-body status-pass">Pass</span>
+            </div>
+                    </div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Severity</div>
+                    <div class="test-field-value text-body">LOW</div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Analysis / Findings</div>
+                    <div class="test-field-value text-body">Returns regulation tile data with classification_breakdown and severity_signal_breakdown. No risk_breakdown present (correctly removed per ontology refactor).</div>
+                  </div>
+                </div>
+              </div>
+<div class="test-card">
+                <div class="test-header">
+                  <h4 class="text-body-medium">TC004 — Document detail with 404 handling</h4>
+                </div>
+                <div class="test-content">
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Test Code</div>
+                    <div class="test-field-value text-body">
+                      <a href="./TC004_dashboard_document_detail_returns_section_level_information_or_404.py" class="text-link">TC004_dashboard_document_detail_returns_section_level_information_or_404.py</a>
+                    </div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Test Error</div>
+                    <div class="test-field-value text-body">`AssertionError: Expected 'error' key in 404 response`</div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Test Visualization and Result</div>
+                    <div class="test-field-value text-body">
+                      <a href="https://www.testsprite.com/dashboard/mcp/tests/7db45cf8-5c39-407c-8048-5d9e9c35ccaf/d9e51315-395c-481a-9b28-606db9e2b031" class="text-link">View Results</a>
+                    </div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Status</div>
+                    <div class="test-field-value">
+                      
+            <div class="status-wrapper">
+                <div class="status-icon">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="7.99961" cy="7.99998" r="6.4" fill="#C23539" fill-opacity="0.2"/>
+<path d="M8 5.59998V7.99698" stroke="#EF4146" stroke-width="1.38478" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M8 10.394V10.3995" stroke="#EF4146" stroke-width="1.38478" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+                </div>
+                <span class="text-body status-fail">Failed</span>
+            </div>
+            
+                    </div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Severity</div>
+                    <div class="test-field-value text-body">LOW</div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Analysis / Findings</div>
+                    <div class="test-field-value text-body">The 200 response for valid document_id 'pipeda' works correctly. The 404 case fails because FastAPI returns `{"detail": "Document not found: xyz"}` per framework convention, but the test expects an `{"error": "..."}` key. This is a test expectation mismatch, not a code bug. FastAPI's HTTPException always uses the `detail` field.</div>
                   </div>
                 </div>
               </div>
@@ -1551,7 +1590,7 @@ body {
           <div class="accordion-header" onclick="toggleAccordion(this)">
             <div class="requirement-content">
                                           <div class="requirement-title-row">
-              <h3 class="title-requirement">Requirement: Legislation Discovery</h3>
+              <h3 class="title-requirement">Requirement: Dashboard Statistics</h3>
                 <div class="requirement-status-tag status-success">
               <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="7.99961" cy="7.99998" r="6.4" fill="#10A363" fill-opacity="0.2"/>
@@ -1573,13 +1612,13 @@ body {
             <div class="test-wrapper">
 <div class="test-card">
                 <div class="test-header">
-                  <h4 class="text-body-medium">TC003 legislation_discovery_and_download</h4>
+                  <h4 class="text-body-medium">TC005 — Dashboard stats</h4>
                 </div>
                 <div class="test-content">
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Test Code</div>
                     <div class="test-field-value text-body">
-                      <a href="./TC003_legislation_discovery_and_download.py" class="text-link">TC003_legislation_discovery_and_download.py</a>
+                      <a href="./TC005_dashboard_stats_endpoint_returns_aggregate_metrics.py" class="text-link">TC005_dashboard_stats_endpoint_returns_aggregate_metrics.py</a>
                     </div>
                   </div>
                   <div class="test-field">
@@ -1589,7 +1628,7 @@ body {
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Test Visualization and Result</div>
                     <div class="test-field-value text-body">
-                      <a href="https://www.testsprite.com/dashboard/mcp/tests/2682af86-62b1-4c70-8c48-29e902c163e4/903a19e5-2432-45d9-a3fb-3c180914b36f" class="text-link">View Results</a>
+                      <a href="https://www.testsprite.com/dashboard/mcp/tests/7db45cf8-5c39-407c-8048-5d9e9c35ccaf/5571c24b-343a-40cb-b1bd-8bb63cc2749c" class="text-link">View Results</a>
                     </div>
                   </div>
                   <div class="test-field">
@@ -1612,7 +1651,159 @@ body {
                   </div>
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Analysis / Findings</div>
-                    <div class="test-field-value text-body">Successfully discovers "Privacy Act" from manifest (discovered_count: 1). Returns 404 for non-existent acts. Supports both full name and slug-format matching.</div>
+                    <div class="test-field-value text-body">Returns correct aggregate metrics: total_sections, total_documents, classifications, severity_signals, operational_areas, and punitive_obligations.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+                <div class="requirement-wrapper accordion-item active">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            <div class="requirement-content">
+                                          <div class="requirement-title-row">
+              <h3 class="title-requirement">Requirement: Sample Policies</h3>
+                <div class="requirement-status-tag status-error">
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="7.99961" cy="7.99998" r="6.4" fill="#C23539" fill-opacity="0.2"/>
+                <path d="M8 5.59998V7.99698" stroke="#EF4146" stroke-width="1.38478" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10.394V10.3995" stroke="#EF4146" stroke-width="1.38478" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>0/1</span>
+            </div>
+              </div>
+              <p class="text-body-medium requirement-description">Proper error handling for API calls and invalid data scenarios.</p>
+            </div>
+            <div class="accordion-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M11.4276 6C11.9145 6 12.1687 6.61626 11.875 7.01439L11.8316 7.06689L8.40295 10.817C8.30455 10.9246 8.17364 10.9892 8.03476 10.9988C7.89589 11.0083 7.7586 10.9621 7.64865 10.8688L7.59493 10.817L4.16629 7.06689L4.11886 7.00814L4.088 6.96002L4.05714 6.90002L4.04743 6.87752L4.032 6.83564L4.01371 6.76814L4.008 6.73501L4.00229 6.69751L4 6.66189V6.58814L4.00286 6.55188L4.008 6.51438L4.01371 6.48188L4.032 6.41438L4.04743 6.37251L4.08743 6.29L4.12457 6.23375L4.16629 6.18313L4.22 6.13125L4.26401 6.0975L4.31886 6.06375L4.33944 6.05313L4.37772 6.03625L4.43944 6.01625L4.46972 6.01L4.50401 6.00375L4.53658 6.00125L11.4276 6Z" fill="var(--fg-secondary)"/>
+              </svg>
+            </div>
+          </div>
+
+            <div class="accordion-content">
+            <div class="test-wrapper">
+<div class="test-card">
+                <div class="test-header">
+                  <h4 class="text-body-medium">TC006 — Sample policies list and retrieve</h4>
+                </div>
+                <div class="test-content">
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Test Code</div>
+                    <div class="test-field-value text-body">
+                      <a href="./TC006_sample_policies_list_and_retrieve_specific_policy.py" class="text-link">TC006_sample_policies_list_and_retrieve_specific_policy.py</a>
+                    </div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Test Error</div>
+                    <div class="test-field-value text-body">`AssertionError: Unexpected error message for nonexistent policy`</div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Test Visualization and Result</div>
+                    <div class="test-field-value text-body">
+                      <a href="https://www.testsprite.com/dashboard/mcp/tests/7db45cf8-5c39-407c-8048-5d9e9c35ccaf/15e4275e-a2d4-4865-97f6-1649027960ea" class="text-link">View Results</a>
+                    </div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Status</div>
+                    <div class="test-field-value">
+                      
+            <div class="status-wrapper">
+                <div class="status-icon">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="7.99961" cy="7.99998" r="6.4" fill="#C23539" fill-opacity="0.2"/>
+<path d="M8 5.59998V7.99698" stroke="#EF4146" stroke-width="1.38478" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M8 10.394V10.3995" stroke="#EF4146" stroke-width="1.38478" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+                </div>
+                <span class="text-body status-fail">Failed</span>
+            </div>
+            
+                    </div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Severity</div>
+                    <div class="test-field-value text-body">LOW</div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Analysis / Findings</div>
+                    <div class="test-field-value text-body">Listing policies and retrieving valid policy 'quicklend_privacy_notice' works. The 404 case for nonexistent policy fails because the test expects a specific error message format. The API correctly returns 404 with `{"detail": "Sample policy not found: xyz"}`. This is a test expectation mismatch on the error message string.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+                <div class="requirement-wrapper accordion-item active">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            <div class="requirement-content">
+                                          <div class="requirement-title-row">
+              <h3 class="title-requirement">Requirement: Single Regulation Comparison</h3>
+                <div class="requirement-status-tag status-error">
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="7.99961" cy="7.99998" r="6.4" fill="#C23539" fill-opacity="0.2"/>
+                <path d="M8 5.59998V7.99698" stroke="#EF4146" stroke-width="1.38478" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10.394V10.3995" stroke="#EF4146" stroke-width="1.38478" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>0/1</span>
+            </div>
+              </div>
+              <p class="text-body-medium requirement-description">Proper error handling for API calls and invalid data scenarios.</p>
+            </div>
+            <div class="accordion-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M11.4276 6C11.9145 6 12.1687 6.61626 11.875 7.01439L11.8316 7.06689L8.40295 10.817C8.30455 10.9246 8.17364 10.9892 8.03476 10.9988C7.89589 11.0083 7.7586 10.9621 7.64865 10.8688L7.59493 10.817L4.16629 7.06689L4.11886 7.00814L4.088 6.96002L4.05714 6.90002L4.04743 6.87752L4.032 6.83564L4.01371 6.76814L4.008 6.73501L4.00229 6.69751L4 6.66189V6.58814L4.00286 6.55188L4.008 6.51438L4.01371 6.48188L4.032 6.41438L4.04743 6.37251L4.08743 6.29L4.12457 6.23375L4.16629 6.18313L4.22 6.13125L4.26401 6.0975L4.31886 6.06375L4.33944 6.05313L4.37772 6.03625L4.43944 6.01625L4.46972 6.01L4.50401 6.00375L4.53658 6.00125L11.4276 6Z" fill="var(--fg-secondary)"/>
+              </svg>
+            </div>
+          </div>
+
+            <div class="accordion-content">
+            <div class="test-wrapper">
+<div class="test-card">
+                <div class="test-header">
+                  <h4 class="text-body-medium">TC007 — Single regulation comparison</h4>
+                </div>
+                <div class="test-content">
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Test Code</div>
+                    <div class="test-field-value text-body">
+                      <a href="./TC007_single_regulation_comparison_returns_comparison_results_or_errors.py" class="text-link">TC007_single_regulation_comparison_returns_comparison_results_or_errors.py</a>
+                    </div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Test Error</div>
+                    <div class="test-field-value text-body">`ReadTimeout: Read timed out. (read timeout=30)`</div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Test Visualization and Result</div>
+                    <div class="test-field-value text-body">
+                      <a href="https://www.testsprite.com/dashboard/mcp/tests/7db45cf8-5c39-407c-8048-5d9e9c35ccaf/55f5b904-35fa-41e3-b3b7-c0eed2f26f46" class="text-link">View Results</a>
+                    </div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Status</div>
+                    <div class="test-field-value">
+                      
+            <div class="status-wrapper">
+                <div class="status-icon">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="7.99961" cy="7.99998" r="6.4" fill="#C23539" fill-opacity="0.2"/>
+<path d="M8 5.59998V7.99698" stroke="#EF4146" stroke-width="1.38478" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M8 10.394V10.3995" stroke="#EF4146" stroke-width="1.38478" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+                </div>
+                <span class="text-body status-fail">Failed</span>
+            </div>
+            
+                    </div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Severity</div>
+                    <div class="test-field-value text-body">MEDIUM</div>
+                  </div>
+                  <div class="test-field">
+                    <div class="test-field-label text-body-medium">Analysis / Findings</div>
+                    <div class="test-field-value text-body">The comparison endpoint works correctly but the Groq LLM inference takes >30 seconds for PIPEDA (61 obligations batched across multiple API calls). TestSprite's tunnel has a 30-second timeout which is insufficient for LLM-powered comparison. The endpoint works when called directly (verified via curl). This is an infrastructure timeout, not a code bug. Options: (1) increase test timeout, (2) add a fast-path that uses embeddings when LLM is too slow, (3) use async processing with polling.</div>
                   </div>
                 </div>
               </div>
@@ -1646,13 +1837,13 @@ body {
             <div class="test-wrapper">
 <div class="test-card">
                 <div class="test-header">
-                  <h4 class="text-body-medium">TC004 semantic_search_over_gold_embeddings</h4>
+                  <h4 class="text-body-medium">TC009 — Semantic search</h4>
                 </div>
                 <div class="test-content">
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Test Code</div>
                     <div class="test-field-value text-body">
-                      <a href="./TC004_semantic_search_over_gold_embeddings.py" class="text-link">TC004_semantic_search_over_gold_embeddings.py</a>
+                      <a href="./TC009_semantic_search_returns_relevant_results_or_error.py" class="text-link">TC009_semantic_search_returns_relevant_results_or_error.py</a>
                     </div>
                   </div>
                   <div class="test-field">
@@ -1662,7 +1853,7 @@ body {
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Test Visualization and Result</div>
                     <div class="test-field-value text-body">
-                      <a href="https://www.testsprite.com/dashboard/mcp/tests/2682af86-62b1-4c70-8c48-29e902c163e4/d6ff66f0-b9fc-4d99-832a-06db95279a90" class="text-link">View Results</a>
+                      <a href="https://www.testsprite.com/dashboard/mcp/tests/7db45cf8-5c39-407c-8048-5d9e9c35ccaf/337a703d-846c-4f30-a4bd-aba3f3825cf9" class="text-link">View Results</a>
                     </div>
                   </div>
                   <div class="test-field">
@@ -1685,80 +1876,7 @@ body {
                   </div>
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Analysis / Findings</div>
-                    <div class="test-field-value text-body">Returns relevant sections for "money laundering" queries with normalized scores (0.0-1.0). Results include section_id, title, body, score, and document fields. Singleton search engine loads once and persists across requests for optimal performance.</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-                <div class="requirement-wrapper accordion-item active">
-          <div class="accordion-header" onclick="toggleAccordion(this)">
-            <div class="requirement-content">
-                                          <div class="requirement-title-row">
-              <h3 class="title-requirement">Requirement: Knowledge Graph Construction</h3>
-                <div class="requirement-status-tag status-success">
-              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="7.99961" cy="7.99998" r="6.4" fill="#10A363" fill-opacity="0.2"/>
-                <path d="M5.59961 8.00002L7.19961 9.60002L10.3996 6.40002" stroke="#19C379" stroke-width="1.28" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span>1/1</span>
-            </div>
-              </div>
-              <p class="text-body-medium requirement-description">Proper error handling for API calls and invalid data scenarios.</p>
-            </div>
-            <div class="accordion-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11.4276 6C11.9145 6 12.1687 6.61626 11.875 7.01439L11.8316 7.06689L8.40295 10.817C8.30455 10.9246 8.17364 10.9892 8.03476 10.9988C7.89589 11.0083 7.7586 10.9621 7.64865 10.8688L7.59493 10.817L4.16629 7.06689L4.11886 7.00814L4.088 6.96002L4.05714 6.90002L4.04743 6.87752L4.032 6.83564L4.01371 6.76814L4.008 6.73501L4.00229 6.69751L4 6.66189V6.58814L4.00286 6.55188L4.008 6.51438L4.01371 6.48188L4.032 6.41438L4.04743 6.37251L4.08743 6.29L4.12457 6.23375L4.16629 6.18313L4.22 6.13125L4.26401 6.0975L4.31886 6.06375L4.33944 6.05313L4.37772 6.03625L4.43944 6.01625L4.46972 6.01L4.50401 6.00375L4.53658 6.00125L11.4276 6Z" fill="var(--fg-secondary)"/>
-              </svg>
-            </div>
-          </div>
-
-            <div class="accordion-content">
-            <div class="test-wrapper">
-<div class="test-card">
-                <div class="test-header">
-                  <h4 class="text-body-medium">TC005 knowledge_graph_building_from_manifest</h4>
-                </div>
-                <div class="test-content">
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Test Code</div>
-                    <div class="test-field-value text-body">
-                      <a href="./TC005_knowledge_graph_building_from_manifest.py" class="text-link">TC005_knowledge_graph_building_from_manifest.py</a>
-                    </div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Test Error</div>
-                    <div class="test-field-value text-body">N/A</div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Test Visualization and Result</div>
-                    <div class="test-field-value text-body">
-                      <a href="https://www.testsprite.com/dashboard/mcp/tests/2682af86-62b1-4c70-8c48-29e902c163e4/238f9d07-94ca-41e7-9a22-40e5af1c597d" class="text-link">View Results</a>
-                    </div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Status</div>
-                    <div class="test-field-value">
-                      <div class="status-wrapper">
-                <div class="status-icon">
-                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="7.99961" cy="7.99998" r="6.4" fill="#10A363" fill-opacity="0.2"/>
-                        <path d="M5.59961 8.00002L7.19961 9.60002L10.3996 6.40002" stroke="#19C379" stroke-width="1.28" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </div>
-                <span class="text-body status-pass">Pass</span>
-            </div>
-                    </div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Severity</div>
-                    <div class="test-field-value text-body">LOW</div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Analysis / Findings</div>
-                    <div class="test-field-value text-body">Reports 509 nodes and 121 edges from the existing knowledge graph. Correctly validates manifest path existence before processing.</div>
+                    <div class="test-field-value text-body">Semantic search returns relevant regulatory sections with scores, titles, bodies, and document identifiers. FAISS index loads correctly.</div>
                   </div>
                 </div>
               </div>
@@ -1792,13 +1910,13 @@ body {
             <div class="test-wrapper">
 <div class="test-card">
                 <div class="test-header">
-                  <h4 class="text-body-medium">TC006 data_validation_checks</h4>
+                  <h4 class="text-body-medium">TC010 — Data validation</h4>
                 </div>
                 <div class="test-content">
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Test Code</div>
                     <div class="test-field-value text-body">
-                      <a href="./TC006_data_validation_checks.py" class="text-link">TC006_data_validation_checks.py</a>
+                      <a href="./TC010_data_validation_endpoint_reports_integrity_status.py" class="text-link">TC010_data_validation_endpoint_reports_integrity_status.py</a>
                     </div>
                   </div>
                   <div class="test-field">
@@ -1808,7 +1926,7 @@ body {
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Test Visualization and Result</div>
                     <div class="test-field-value text-body">
-                      <a href="https://www.testsprite.com/dashboard/mcp/tests/2682af86-62b1-4c70-8c48-29e902c163e4/5a17f736-e1c2-465d-bb42-97339f9b2302" class="text-link">View Results</a>
+                      <a href="https://www.testsprite.com/dashboard/mcp/tests/7db45cf8-5c39-407c-8048-5d9e9c35ccaf/47f04983-7f84-4feb-bdfa-c128e8dc57c0" class="text-link">View Results</a>
                     </div>
                   </div>
                   <div class="test-field">
@@ -1831,153 +1949,7 @@ body {
                   </div>
                   <div class="test-field">
                     <div class="test-field-label text-body-medium">Analysis / Findings</div>
-                    <div class="test-field-value text-body">Consistently validates all three storage layers (Bronze: 5 docs, Silver: 10 docs, Gold: 9 docs). Returns structured valid/errors/warnings response. Most stable test across all rounds.</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-                <div class="requirement-wrapper accordion-item active">
-          <div class="accordion-header" onclick="toggleAccordion(this)">
-            <div class="requirement-content">
-                                          <div class="requirement-title-row">
-              <h3 class="title-requirement">Requirement: Email Signup</h3>
-                <div class="requirement-status-tag status-success">
-              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="7.99961" cy="7.99998" r="6.4" fill="#10A363" fill-opacity="0.2"/>
-                <path d="M5.59961 8.00002L7.19961 9.60002L10.3996 6.40002" stroke="#19C379" stroke-width="1.28" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span>1/1</span>
-            </div>
-              </div>
-              <p class="text-body-medium requirement-description">Proper error handling for API calls and invalid data scenarios.</p>
-            </div>
-            <div class="accordion-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11.4276 6C11.9145 6 12.1687 6.61626 11.875 7.01439L11.8316 7.06689L8.40295 10.817C8.30455 10.9246 8.17364 10.9892 8.03476 10.9988C7.89589 11.0083 7.7586 10.9621 7.64865 10.8688L7.59493 10.817L4.16629 7.06689L4.11886 7.00814L4.088 6.96002L4.05714 6.90002L4.04743 6.87752L4.032 6.83564L4.01371 6.76814L4.008 6.73501L4.00229 6.69751L4 6.66189V6.58814L4.00286 6.55188L4.008 6.51438L4.01371 6.48188L4.032 6.41438L4.04743 6.37251L4.08743 6.29L4.12457 6.23375L4.16629 6.18313L4.22 6.13125L4.26401 6.0975L4.31886 6.06375L4.33944 6.05313L4.37772 6.03625L4.43944 6.01625L4.46972 6.01L4.50401 6.00375L4.53658 6.00125L11.4276 6Z" fill="var(--fg-secondary)"/>
-              </svg>
-            </div>
-          </div>
-
-            <div class="accordion-content">
-            <div class="test-wrapper">
-<div class="test-card">
-                <div class="test-header">
-                  <h4 class="text-body-medium">TC007 email_signup_submission</h4>
-                </div>
-                <div class="test-content">
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Test Code</div>
-                    <div class="test-field-value text-body">
-                      <a href="./TC007_email_signup_submission.py" class="text-link">TC007_email_signup_submission.py</a>
-                    </div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Test Error</div>
-                    <div class="test-field-value text-body">N/A</div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Test Visualization and Result</div>
-                    <div class="test-field-value text-body">
-                      <a href="https://www.testsprite.com/dashboard/mcp/tests/2682af86-62b1-4c70-8c48-29e902c163e4/55429333-5181-495c-81c0-c92c199bfa98" class="text-link">View Results</a>
-                    </div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Status</div>
-                    <div class="test-field-value">
-                      <div class="status-wrapper">
-                <div class="status-icon">
-                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="7.99961" cy="7.99998" r="6.4" fill="#10A363" fill-opacity="0.2"/>
-                        <path d="M5.59961 8.00002L7.19961 9.60002L10.3996 6.40002" stroke="#19C379" stroke-width="1.28" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </div>
-                <span class="text-body status-pass">Pass</span>
-            </div>
-                    </div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Severity</div>
-                    <div class="test-field-value text-body">LOW</div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Analysis / Findings</div>
-                    <div class="test-field-value text-body">Accepts valid emails, rejects invalid format with 400 error. This endpoint was added during Round 1 testing — TestSprite identified a missing feature (backend had no email capability). Bug found and fixed.</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-                <div class="requirement-wrapper accordion-item active">
-          <div class="accordion-header" onclick="toggleAccordion(this)">
-            <div class="requirement-content">
-                                          <div class="requirement-title-row">
-              <h3 class="title-requirement">Requirement: Web Scraping</h3>
-                <div class="requirement-status-tag status-success">
-              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="7.99961" cy="7.99998" r="6.4" fill="#10A363" fill-opacity="0.2"/>
-                <path d="M5.59961 8.00002L7.19961 9.60002L10.3996 6.40002" stroke="#19C379" stroke-width="1.28" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span>1/1</span>
-            </div>
-              </div>
-              <p class="text-body-medium requirement-description">Proper error handling for API calls and invalid data scenarios.</p>
-            </div>
-            <div class="accordion-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11.4276 6C11.9145 6 12.1687 6.61626 11.875 7.01439L11.8316 7.06689L8.40295 10.817C8.30455 10.9246 8.17364 10.9892 8.03476 10.9988C7.89589 11.0083 7.7586 10.9621 7.64865 10.8688L7.59493 10.817L4.16629 7.06689L4.11886 7.00814L4.088 6.96002L4.05714 6.90002L4.04743 6.87752L4.032 6.83564L4.01371 6.76814L4.008 6.73501L4.00229 6.69751L4 6.66189V6.58814L4.00286 6.55188L4.008 6.51438L4.01371 6.48188L4.032 6.41438L4.04743 6.37251L4.08743 6.29L4.12457 6.23375L4.16629 6.18313L4.22 6.13125L4.26401 6.0975L4.31886 6.06375L4.33944 6.05313L4.37772 6.03625L4.43944 6.01625L4.46972 6.01L4.50401 6.00375L4.53658 6.00125L11.4276 6Z" fill="var(--fg-secondary)"/>
-              </svg>
-            </div>
-          </div>
-
-            <div class="accordion-content">
-            <div class="test-wrapper">
-<div class="test-card">
-                <div class="test-header">
-                  <h4 class="text-body-medium">TC008 web_scraping_regulatory_content</h4>
-                </div>
-                <div class="test-content">
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Test Code</div>
-                    <div class="test-field-value text-body">
-                      <a href="./TC008_web_scraping_regulatory_content.py" class="text-link">TC008_web_scraping_regulatory_content.py</a>
-                    </div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Test Error</div>
-                    <div class="test-field-value text-body">N/A</div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Test Visualization and Result</div>
-                    <div class="test-field-value text-body">
-                      <a href="https://www.testsprite.com/dashboard/mcp/tests/2682af86-62b1-4c70-8c48-29e902c163e4/26c267cd-1810-42bc-8468-ecd0875b9765" class="text-link">View Results</a>
-                    </div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Status</div>
-                    <div class="test-field-value">
-                      <div class="status-wrapper">
-                <div class="status-icon">
-                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="7.99961" cy="7.99998" r="6.4" fill="#10A363" fill-opacity="0.2"/>
-                        <path d="M5.59961 8.00002L7.19961 9.60002L10.3996 6.40002" stroke="#19C379" stroke-width="1.28" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </div>
-                <span class="text-body status-pass">Pass</span>
-            </div>
-                    </div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Severity</div>
-                    <div class="test-field-value text-body">LOW</div>
-                  </div>
-                  <div class="test-field">
-                    <div class="test-field-label text-body-medium">Analysis / Findings</div>
-                    <div class="test-field-value text-body">Returns 8 FINTRAC guidance PDFs. Correctly searches multiple directory locations (data/raw/fintrac/ and data/raw/guidance/fintrac/). Returns 422 for unsupported scrape sources.</div>
+                    <div class="test-field-value text-body">Validation endpoint correctly reports layer status with valid boolean, errors array, and warnings array.</div>
                   </div>
                 </div>
               </div>
