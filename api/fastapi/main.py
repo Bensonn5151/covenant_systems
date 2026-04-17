@@ -730,14 +730,42 @@ def _build_multi_comparison(policy_sections: list, policy_id: str, threshold: fl
     details = {}
     if use_llm:
         from api.fastapi.llm_compare import llm_compare_policy_to_regulation
-        print(f"\n  Using Groq LLM for {len(regulations)} regulations...")
+        from api.fastapi.compare import compare_policy_to_regulation
+        from ingestion.embed.embedder import get_embedder
+
+        # Pre-load embedder for fallback
+        embedder = get_embedder()
+        policy_texts = [s.get("body", s.get("title", "")) for s in policy_sections]
+        policy_embeddings = embedder.embed_texts(policy_texts)
+
+        print(f"\n  Using Groq LLM for {len(regulations)} regulations (embedding fallback on rate limit)...")
         for reg_id in regulations:
             print(f"  Comparing against {reg_id}...")
-            details[reg_id] = llm_compare_policy_to_regulation(
-                policy_sections=policy_sections,
-                regulation_id=reg_id,
-                policy_id=policy_id,
-            )
+            try:
+                result = llm_compare_policy_to_regulation(
+                    policy_sections=policy_sections,
+                    regulation_id=reg_id,
+                    policy_id=policy_id,
+                )
+                # Check if LLM returned mostly errors (all gaps with "LLM error" reasoning)
+                gap_errors = sum(
+                    1 for g in result.get("gap_details", [])
+                    if "LLM error" in (g.get("matched_policy_body") or "") or "unparseable" in (g.get("matched_policy_body") or "")
+                )
+                if gap_errors > 0 and gap_errors == len(result.get("gap_details", [])):
+                    raise RuntimeError("LLM returned all errors, falling back to embeddings")
+                details[reg_id] = result
+            except Exception as e:
+                print(f"    LLM failed for {reg_id}: {e}")
+                print(f"    Falling back to semantic similarity for {reg_id}...")
+                details[reg_id] = compare_policy_to_regulation(
+                    policy_sections=policy_sections,
+                    regulation_id=reg_id,
+                    threshold=threshold,
+                    policy_id=policy_id,
+                    embedder=embedder,
+                    policy_embeddings=policy_embeddings,
+                )
     else:
         from api.fastapi.compare import compare_policy_to_regulation
         from ingestion.embed.embedder import get_embedder
