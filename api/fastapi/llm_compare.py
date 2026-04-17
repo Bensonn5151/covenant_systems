@@ -116,7 +116,11 @@ For each obligation, you must return a JSON object with:
 - "matched_clause": the title or first sentence of the policy section that best addresses this obligation (null if gap)
 - "reasoning": one sentence explaining your verdict
 
-Be strict. A policy clause must specifically address the regulatory requirement, not just mention related words. If the policy is vague where the regulation is specific, that's "partial" not "covered"."""
+Rules:
+- "covered" means the policy has language that substantively addresses the obligation's intent, even if the exact wording differs
+- "partial" means the policy touches on the topic but doesn't fully satisfy the specific requirement
+- "gap" means the policy is completely silent on this obligation
+- Large comprehensive policies (like those from Apple, Google, etc.) will naturally cover most obligations — don't mark something as a gap just because the policy uses different terminology"""
 
 
 def _build_user_prompt(policy_text: str, obligations: List[Dict]) -> str:
@@ -135,7 +139,7 @@ def _build_user_prompt(policy_text: str, obligations: List[Dict]) -> str:
     return f"""Here is the company's privacy policy:
 
 ---POLICY START---
-{policy_text[:12000]}
+{policy_text[:60000]}
 ---POLICY END---
 
 Evaluate each of the following {len(obligations)} regulatory obligations against the policy above. Return a JSON array with one object per obligation, in the same order. Each object must have: "section_id", "status", "matched_clause", "reasoning".
