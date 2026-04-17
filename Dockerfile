@@ -33,8 +33,8 @@ COPY data/ data/
 COPY gold_builder.py .
 COPY batch_ingest.py .
 
-# Port
-EXPOSE 8000
+# Render sets PORT env var (usually 10000)
+EXPOSE 10000
 
-# Render sets PORT env var; default to 8000
-CMD uvicorn api.fastapi.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Use shell form so $PORT is expanded at runtime
+CMD ["sh", "-c", "uvicorn api.fastapi.main:app --host 0.0.0.0 --port ${PORT:-10000}"]
