@@ -840,16 +840,89 @@ class MultiCompareRequest(BaseModel):
     threshold: float = 0.5
 
 
+def _save_assessment_to_db(policy_name: str, policy_filename: str | None,
+                           policy_sections: list, raw_text: str | None,
+                           result: dict, user_id: str = "anonymous") -> int | None:
+    """Save a policy and its assessment to Supabase. Returns assessment_id."""
+    if not os.environ.get("DATABASE_URL"):
+        return None
+    try:
+        from api.fastapi.db import save_policy, save_assessment
+        policy_db_id = save_policy(
+            uploaded_by=user_id,
+            name=policy_name,
+            filename=policy_filename,
+            raw_text=raw_text,
+            sections=policy_sections,
+        )
+        # Flatten all results into assessment_results rows
+        all_results = []
+        for reg_id, detail in result.get("details", {}).items():
+            for entry_list in [detail.get("gap_details", []), detail.get("partial_details", []), detail.get("matches", [])]:
+                for entry in entry_list:
+                    all_results.append({
+                        "regulation_document_id": reg_id,
+                        "regulation_section_id": entry.get("regulation_section_id", ""),
+                        "regulation_title": entry.get("regulation_title", ""),
+                        "coverage_status": entry.get("coverage_status", "gap"),
+                        "residual_risk": entry.get("residual_risk", "high"),
+                        "severity_signal": entry.get("severity_signal"),
+                        "matched_policy_clause": entry.get("matched_policy_section"),
+                        "reasoning": entry.get("matched_policy_body"),
+                        "operational_areas": entry.get("operational_areas", []),
+                    })
+        summaries = result.get("summary", {})
+        total_gaps = sum(s.get("gaps", 0) for s in summaries.values())
+        total_covered = sum(s.get("covered", 0) for s in summaries.values())
+        scores = [s.get("score", 0) for s in summaries.values()]
+        avg_cov = round(sum(scores) / len(scores), 1) if scores else 0
+
+        assessment_id = save_assessment(
+            policy_id=policy_db_id,
+            run_by=user_id,
+            regulation_count=len(result.get("regulations", [])),
+            avg_coverage=avg_cov,
+            total_gaps=total_gaps,
+            total_covered=total_covered,
+            heatmap=result.get("heatmap", {}),
+            summary=summaries,
+            results=all_results,
+        )
+        return assessment_id
+    except Exception as e:
+        print(f"  Warning: failed to save assessment to DB: {e}")
+        return None
+
+
 @app.post("/api/compare-all")
 async def compare_all_regulations(req: MultiCompareRequest):
-    """Compare a policy against ALL regulations and return a risk heatmap."""
+    """Compare a policy against ALL regulations and return a risk heatmap.
+    Saves the assessment to Supabase for later retrieval."""
     try:
         sections, policy_id = _resolve_policy_sections(
             req.sample_policy_id, req.policy_text, req.policy_sections,
         )
         if not sections:
             raise HTTPException(status_code=400, detail="No sections found in policy document")
-        return _build_multi_comparison(sections, policy_id, req.threshold)
+        result = _build_multi_comparison(sections, policy_id, req.threshold)
+
+        # Save to DB
+        raw_text = None
+        if req.sample_policy_id:
+            path = SAMPLE_POLICIES / f"{req.sample_policy_id}.txt"
+            if path.exists():
+                raw_text = path.read_text()
+        assessment_id = _save_assessment_to_db(
+            policy_name=policy_id,
+            policy_filename=f"{policy_id}.txt" if req.sample_policy_id else None,
+            policy_sections=sections,
+            raw_text=raw_text,
+            result=result,
+        )
+        if assessment_id:
+            result["assessment_id"] = assessment_id
+
+        return result
     except HTTPException:
         raise
     except FileNotFoundError as e:
@@ -870,7 +943,110 @@ async def compare_all_uploaded(file: UploadFile = File(...), threshold: float = 
     result = _build_multi_comparison(sections, file.filename, threshold)
     result["filename"] = file.filename
     result["sections_extracted"] = len(sections)
+
+    raw_text = content.decode("utf-8", errors="ignore") if file.filename.endswith(".txt") else None
+    assessment_id = _save_assessment_to_db(
+        policy_name=file.filename,
+        policy_filename=file.filename,
+        policy_sections=sections,
+        raw_text=raw_text,
+        result=result,
+    )
+    if assessment_id:
+        result["assessment_id"] = assessment_id
+
     return result
+
+
+# ── Past Assessments ─────────────────────────────────────────────────────────
+
+@app.get("/api/assessments")
+async def list_assessments_endpoint():
+    """List all saved compliance assessments."""
+    if not os.environ.get("DATABASE_URL"):
+        return {"assessments": []}
+    from api.fastapi.db import get_conn
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT ca.id, p.name, p.filename, ca.regulation_count, ca.avg_coverage,
+                   ca.total_gaps, ca.total_covered, ca.created_at
+            FROM compliance_assessments ca
+            JOIN policies p ON ca.policy_id = p.id
+            ORDER BY ca.created_at DESC
+            LIMIT 50
+        """)
+        cols = [d[0] for d in cur.description]
+        rows = [dict(zip(cols, row)) for row in cur.fetchall()]
+        for r in rows:
+            r["created_at"] = str(r["created_at"])
+    return {"assessments": rows}
+
+
+@app.get("/api/assessments/{assessment_id}")
+async def get_assessment_endpoint(assessment_id: int):
+    """Load a saved assessment with full heatmap + summary (no details — those are in assessment_results)."""
+    if not os.environ.get("DATABASE_URL"):
+        raise HTTPException(status_code=404, detail="Database not configured")
+    from api.fastapi.db import get_assessment
+    assessment = get_assessment(assessment_id)
+    if not assessment:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+
+    # Load assessment results grouped by regulation
+    from api.fastapi.db import get_conn
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT regulation_document_id, regulation_section_id, regulation_title,
+                   coverage_status, residual_risk, severity_signal,
+                   matched_policy_clause, reasoning, operational_areas
+            FROM assessment_results
+            WHERE assessment_id = %s
+            ORDER BY id
+        """, (assessment_id,))
+        cols = [d[0] for d in cur.description]
+        results = [dict(zip(cols, row)) for row in cur.fetchall()]
+
+    # Rebuild details structure from saved results
+    details: dict = {}
+    for r in results:
+        reg_id = r["regulation_document_id"]
+        if reg_id not in details:
+            details[reg_id] = {"gap_details": [], "partial_details": [], "matches": []}
+        entry = {
+            "regulation_section_id": r["regulation_section_id"],
+            "regulation_title": r["regulation_title"],
+            "regulation_body": "",
+            "classification": "obligation",
+            "severity_signal": r["severity_signal"] or "mandatory",
+            "operational_areas": r["operational_areas"] or [],
+            "coverage_status": r["coverage_status"],
+            "coverage_score": 0.85 if r["coverage_status"] == "covered" else 0.45 if r["coverage_status"] == "partial" else 0.15,
+            "best_match_score": 0.85 if r["coverage_status"] == "covered" else 0.45 if r["coverage_status"] == "partial" else 0.15,
+            "residual_risk": r["residual_risk"],
+            "is_covered": r["coverage_status"] == "covered",
+            "matched_policy_section": r["matched_policy_clause"],
+            "matched_policy_body": r["reasoning"],
+            "evidence_policy_section_ids": [],
+        }
+        if r["coverage_status"] == "covered":
+            details[reg_id]["matches"].append(entry)
+        elif r["coverage_status"] == "partial":
+            details[reg_id]["partial_details"].append(entry)
+        else:
+            details[reg_id]["gap_details"].append(entry)
+
+    return {
+        "assessment_id": assessment["id"],
+        "policy_id": str(assessment["policy_id"]),
+        "evaluated_at": assessment["created_at"],
+        "regulations": list(assessment["summary"].keys()) if assessment["summary"] else [],
+        "operational_areas": _OPERATIONAL_AREAS,
+        "heatmap": assessment["heatmap"] or {},
+        "summary": assessment["summary"] or {},
+        "details": details,
+    }
 
 
 # ── Compliance Coverage (policy ↔ regulation mapping) ────────────────────────

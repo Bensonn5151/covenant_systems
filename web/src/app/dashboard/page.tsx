@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Shield, CheckCircle, XCircle, AlertTriangle, FileUp, Upload, Loader2, X } from "lucide-react";
-import { fetchSamplePolicies, runMultiComparison, runMultiComparisonWithFile } from "@/lib/api";
-import type { SamplePolicy, MultiComparisonResult, ComparisonMatch } from "@/lib/types";
+import { Shield, CheckCircle, XCircle, AlertTriangle, FileUp, Upload, Loader2, X, Clock, BarChart3 } from "lucide-react";
+import { fetchSamplePolicies, runMultiComparison, runMultiComparisonWithFile, fetchAssessments, fetchAssessment } from "@/lib/api";
+import type { SamplePolicy, MultiComparisonResult, ComparisonMatch, SavedAssessment } from "@/lib/types";
 import StatCard from "@/components/shared/StatCard";
 import ComplianceHealthScore from "@/components/dashboard/ComplianceHealthScore";
 import RiskHeatmap from "@/components/dashboard/RiskHeatmap";
@@ -39,15 +39,33 @@ export default function DashboardOverview() {
   const [result, setResult] = useState<MultiComparisonResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingPolicies, setLoadingPolicies] = useState(true);
-  // area can be null to mean "all areas for this regulation" (clicked the summary row)
   const [activeCell, setActiveCell] = useState<{ regulation: string; area: string | null } | null>(null);
+  const [pastAssessments, setPastAssessments] = useState<SavedAssessment[]>([]);
+  const [loadingPast, setLoadingPast] = useState(false);
 
   useEffect(() => {
     fetchSamplePolicies()
       .then((d) => setPolicies(d.policies))
       .catch(() => {})
       .finally(() => setLoadingPolicies(false));
+    fetchAssessments()
+      .then((d) => setPastAssessments(d.assessments))
+      .catch(() => {});
   }, []);
+
+  async function handleLoadAssessment(id: number) {
+    setLoadingPast(true);
+    setResult(null);
+    setActiveCell(null);
+    try {
+      const data = await fetchAssessment(id);
+      setResult(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingPast(false);
+    }
+  }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -63,11 +81,17 @@ export default function DashboardOverview() {
     setResult(null);
     setActiveCell(null);
     try {
+      let data: MultiComparisonResult;
       if (mode === "upload" && uploadedFile) {
-        setResult(await runMultiComparisonWithFile(uploadedFile));
+        data = await runMultiComparisonWithFile(uploadedFile);
       } else if (mode === "sample" && selectedPolicy) {
-        setResult(await runMultiComparison(selectedPolicy));
+        data = await runMultiComparison(selectedPolicy);
+      } else {
+        return;
       }
+      setResult(data);
+      // Refresh past assessments list
+      fetchAssessments().then((d) => setPastAssessments(d.assessments)).catch(() => {});
     } catch (e) {
       console.error(e);
     } finally {
@@ -241,6 +265,43 @@ export default function DashboardOverview() {
           )}
         </button>
       </div>
+
+      {/* Past Assessments */}
+      {pastAssessments.length > 0 && (
+        <div className="bg-gray-900/40 border border-gray-800 rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="w-4 h-4 text-gray-500" />
+            <span className="text-xs text-gray-500 font-mono uppercase tracking-wider">Past Assessments</span>
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            {pastAssessments.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => handleLoadAssessment(a.id)}
+                disabled={loadingPast}
+                className={`px-4 py-3 rounded-lg text-sm text-left transition-all border ${
+                  result?.assessment_id === a.id
+                    ? "bg-green-500/10 border-green-500/30 text-green-400"
+                    : "bg-gray-800/50 border-gray-700 text-gray-400 hover:text-white hover:border-gray-600"
+                }`}
+              >
+                <div className="font-medium flex items-center gap-2">
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  {a.name.replace(/_/g, " ")}
+                </div>
+                <div className="text-xs opacity-60 mt-0.5">
+                  {a.avg_coverage}% coverage | {a.total_gaps} gaps | {new Date(a.created_at).toLocaleDateString()}
+                </div>
+              </button>
+            ))}
+          </div>
+          {loadingPast && (
+            <div className="flex items-center gap-2 mt-3 text-gray-500 text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading assessment...
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Results */}
       {result && stats && (

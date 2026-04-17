@@ -8,6 +8,7 @@ import type {
   SamplePolicy,
   ComparisonResult,
   MultiComparisonResult,
+  SavedAssessment,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -85,6 +86,14 @@ export async function runMultiComparisonWithFile(file: File): Promise<MultiCompa
     throw new Error(`API error ${res.status}: ${await res.text()}`);
   }
   return res.json();
+}
+
+export async function fetchAssessments(): Promise<{ assessments: SavedAssessment[] }> {
+  return fetchAPI("/api/assessments");
+}
+
+export async function fetchAssessment(id: number): Promise<MultiComparisonResult> {
+  return fetchAPI(`/api/assessments/${id}`);
 }
 
 export async function fetchCoverage(policyId: string, regulationId = "pipeda"): Promise<ComparisonResult> {

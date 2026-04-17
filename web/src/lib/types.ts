@@ -204,4 +204,16 @@ export interface MultiComparisonResult {
   heatmap: Record<string, Record<string, HeatmapCell>>;
   summary: Record<string, RegulationSummary>;
   details: Record<string, ComparisonResult>;
+  assessment_id?: number;
+}
+
+export interface SavedAssessment {
+  id: number;
+  name: string;
+  filename: string | null;
+  regulation_count: number;
+  avg_coverage: number;
+  total_gaps: number;
+  total_covered: number;
+  created_at: string;
 }
