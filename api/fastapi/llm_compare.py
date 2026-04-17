@@ -233,18 +233,22 @@ def llm_compare_policy_to_regulation(
     policy_text = build_policy_text(policy_sections)
     prompt = _build_user_prompt(policy_text, obligations)
 
-    # Call Groq with retry on rate limit
+    # Call Groq — one attempt per batch, no long retries.
+    # If rate-limited, raise immediately so the caller can fall back to embeddings.
     verdicts = []
-    # Batch obligations into chunks to stay within context limits
     batch_size = 20
+    consecutive_failures = 0
+
     for batch_start in range(0, len(obligations), batch_size):
         batch_obs = obligations[batch_start:batch_start + batch_size]
         batch_prompt = _build_user_prompt(policy_text, batch_obs)
+        success = False
 
-        for attempt in range(3):
+        # Try primary model, then fallback model
+        for model in [GROQ_MODEL, GROQ_FALLBACK_MODEL]:
             try:
                 response = client.chat.completions.create(
-                    model=GROQ_MODEL,
+                    model=model,
                     messages=[
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": batch_prompt},
@@ -255,41 +259,27 @@ def llm_compare_policy_to_regulation(
                 raw = response.choices[0].message.content or "[]"
                 batch_verdicts = _parse_llm_response(raw, batch_obs)
                 verdicts.extend(batch_verdicts)
+                success = True
+                consecutive_failures = 0
                 break
             except Exception as e:
                 err_str = str(e).lower()
                 if "rate_limit" in err_str or "429" in err_str:
-                    wait = 15 * (attempt + 1)
-                    print(f"  Rate limited, waiting {wait}s...")
-                    time.sleep(wait)
-                elif attempt == 2:
-                    # Final attempt failed — mark batch as gaps
-                    print(f"  LLM call failed after 3 attempts: {e}")
-                    verdicts.extend([
-                        {"section_id": ob.get("section_id", ""), "status": "gap",
-                         "matched_clause": None, "reasoning": f"LLM error: {str(e)[:100]}"}
-                        for ob in batch_obs
-                    ])
+                    consecutive_failures += 1
+                    print(f"  Rate limited on {model} (batch {batch_start})")
+                    if consecutive_failures >= 2:
+                        # Two consecutive rate limits — raise to trigger embedding fallback
+                        raise RuntimeError(f"Groq rate limit exceeded after {len(verdicts)} verdicts") from e
+                    time.sleep(5)
                 else:
-                    # Try fallback model
-                    try:
-                        response = client.chat.completions.create(
-                            model=GROQ_FALLBACK_MODEL,
-                            messages=[
-                                {"role": "system", "content": SYSTEM_PROMPT},
-                                {"role": "user", "content": batch_prompt},
-                            ],
-                            temperature=0.1,
-                            max_tokens=4000,
-                        )
-                        raw = response.choices[0].message.content or "[]"
-                        batch_verdicts = _parse_llm_response(raw, batch_obs)
-                        verdicts.extend(batch_verdicts)
-                        break
-                    except Exception:
-                        time.sleep(5)
+                    print(f"  {model} error: {e}")
+                    continue
 
-        # Small delay between batches to respect rate limits
+        if not success:
+            # Both models failed for this batch — raise for fallback
+            raise RuntimeError(f"LLM failed for regulation {regulation_id}, batch starting at {batch_start}")
+
+        # Small delay between batches
         if batch_start + batch_size < len(obligations):
             time.sleep(2)
 
